@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "XU0GpNX7rIK5XO66TDgLA"
+uri = "file://BEATWORLD_DESIGN_BRIEF.md"
+type = "text"
+title = "BeatWorld — Game Summary & UI Screen Design Brief"
