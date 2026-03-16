@@ -1,91 +1,101 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { useGameState } from '@/hooks/use-game-state';
 import { CITIES } from '@/lib/game-data';
 import { audio } from '@/lib/audio';
 import { PixelButton } from '@/components/ui/PixelButton';
 import { PixelPanel } from '@/components/ui/PixelPanel';
-import { Play, Square, Save, Music } from 'lucide-react';
+import { Play, Square } from 'lucide-react';
 
 export default function StudioScreen() {
   const { cityId } = useParams();
   const [, setLocation] = useLocation();
   const { state, saveTrack } = useGameState();
-  
+
   const city = cityId ? CITIES[cityId] : null;
-  
-  // Track state: matrix of numInstruments x 16 steps
+
   const [tracks, setTracks] = useState<boolean[][]>(() => {
-    if (cityId && state.tracks[cityId]) {
-      return state.tracks[cityId];
-    }
-    return Array(city?.numInstruments || 4).fill([]).map(() => Array(16).fill(false));
+    if (cityId && state.tracks[cityId]) return state.tracks[cityId];
+    return Array(city?.numInstruments || 4).fill(null).map(() => Array(16).fill(false));
   });
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(120);
-  const [currentStep, setCurrentStep] = useState(0);
-  
-  const intervalRef = useRef<number | null>(null);
+  // Always-fresh ref so the playback interval never reads stale state
+  const tracksRef = useRef(tracks);
+  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
 
-  useEffect(() => {
-    // Init Audio Context on first mount
-    const handleInit = () => audio.init();
-    window.addEventListener('click', handleInit, { once: true });
-    return () => window.removeEventListener('click', handleInit);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [bpm, setBpm] = useState(city?.defaultBpm || 120);
+  const [currentStep, setCurrentStep] = useState(-1);
+  const [audioReady, setAudioReady] = useState(false);
+
+  const intervalRef = useRef<number | null>(null);
+  const stepRef = useRef(0);
+
+  // Initialize audio on first user interaction with the page
+  const ensureAudio = useCallback(async () => {
+    await audio.init();
+    setAudioReady(audio.isReady());
   }, []);
 
-  useEffect(() => {
-    if (isPlaying) {
-      const stepTime = (60000 / bpm) / 4; // 16th notes
-      intervalRef.current = window.setInterval(() => {
-        setCurrentStep((prev) => {
-          const next = (prev + 1) % 16;
-          playStep(next);
-          return next;
-        });
-      }, stepTime);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setCurrentStep(0);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isPlaying, bpm, tracks]);
-
-  const playStep = (step: number) => {
+  const playStep = useCallback((step: number) => {
     if (!city) return;
-    const time = audio.getCurrentTime() + 0.05; // slightly in future for tight scheduling
-    
+    const time = audio.getCurrentTime();
     city.instruments.forEach((inst, idx) => {
-      if (tracks[idx][step]) {
+      if (tracksRef.current[idx]?.[step]) {
         if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) {
           audio.playDrum(inst.type, time);
         } else {
-          // Pass a simple note sequence based on step to make it sound musical
           audio.playSynth(inst.type as any, step, time);
         }
       }
     });
+  }, [city]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      stepRef.current = 0;
+      const stepTime = Math.round((60_000 / bpm) / 4); // 16th-note in ms
+      intervalRef.current = window.setInterval(() => {
+        const s = stepRef.current;
+        setCurrentStep(s);
+        playStep(s);
+        stepRef.current = (s + 1) % 16;
+      }, stepTime);
+    } else {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      setCurrentStep(-1);
+    }
+    return () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isPlaying, bpm, playStep]);
+
+  const handlePlayToggle = async () => {
+    await ensureAudio();
+    setIsPlaying(p => !p);
   };
 
-  const toggleStep = (trackIdx: number, stepIdx: number) => {
-    audio.init(); // Ensure audio ctx is awake
-    const newTracks = [...tracks];
-    newTracks[trackIdx] = [...newTracks[trackIdx]];
-    newTracks[trackIdx][stepIdx] = !newTracks[trackIdx][stepIdx];
+  const toggleStep = async (trackIdx: number, stepIdx: number) => {
+    await ensureAudio();
+    const newTracks = tracks.map((row, i) =>
+      i === trackIdx ? row.map((v, j) => (j === stepIdx ? !v : v)) : row
+    );
     setTracks(newTracks);
-    
-    // Preview sound if activating
-    if (newTracks[trackIdx][stepIdx] && city) {
-      const inst = city.instruments[trackIdx];
-      const time = audio.getCurrentTime();
-      if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) {
-        audio.playDrum(inst.type, time);
-      } else {
-        audio.playSynth(inst.type as any, stepIdx, time);
-      }
+    // Immediate preview sound
+    if (!newTracks[trackIdx][stepIdx]) return;
+    const inst = city?.instruments[trackIdx];
+    if (!inst) return;
+    const t = audio.getCurrentTime();
+    if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) {
+      audio.playDrum(inst.type, t);
+    } else {
+      audio.playSynth(inst.type as any, stepIdx, t);
     }
   };
 
@@ -97,89 +107,199 @@ export default function StudioScreen() {
 
   if (!city) return <div className="text-white p-8">City not found</div>;
 
+  const BEAT_COLORS = [
+    '#ff00ff', '#00ffff', '#ffff00', '#ff8800',
+    '#00ff88', '#ff0088', '#8800ff', '#00ccff',
+    '#ff4444', '#44ff44', '#ff88ff', '#88ffff',
+    '#ffcc00', '#cc00ff', '#00ff44', '#ff0044',
+  ];
+
   return (
-    <div id="studio-capture" className="min-h-screen bg-background relative flex flex-col p-4 md:p-8">
-      <div className="absolute inset-0 scanlines z-10 pointer-events-none"></div>
-      
-      <img 
-        src={`${import.meta.env.BASE_URL}images/studio-bg.png`} 
-        alt="Studio" 
-        className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none" 
+    <div id="studio-capture" className="min-h-screen bg-background relative flex flex-col">
+      <div className="absolute inset-0 scanlines z-10 pointer-events-none" />
+
+      {/* Studio background */}
+      <img
+        src={`${import.meta.env.BASE_URL}images/studio-bg.png`}
+        alt="Studio"
+        className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+        style={{ imageRendering: 'pixelated' }}
       />
 
-      {/* Header */}
-      <div className="flex justify-between items-center z-20 mb-8 bg-black/60 p-4 pixel-borders">
+      {/* Dark gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/80 pointer-events-none" />
+
+      {/* ── Header ── */}
+      <div className="relative z-20 flex justify-between items-center px-6 py-3 bg-black/70 border-b-2 border-primary/50">
         <div>
-          <h1 className="text-2xl text-primary neon-text-primary">{city.name} STUDIO</h1>
-          <p className="text-xs text-secondary mt-2">GENRE: {city.genre}</p>
+          <h1
+            className="text-lg neon-text-primary"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+          >
+            {city.emoji} {city.name.toUpperCase()} STUDIO
+          </h1>
+          <p
+            className="text-[9px] text-secondary mt-1"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+          >
+            {city.genre} · {city.instruments.length} TRACKS · {bpm} BPM
+          </p>
         </div>
-        <div className="flex gap-4 items-center">
+
+        <div className="flex items-center gap-4">
+          {/* BPM */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">BPM</span>
-            <input 
-              type="range" min="80" max="180" value={bpm} 
-              onChange={(e) => setBpm(Number(e.target.value))}
-              className="w-24 accent-primary"
+            <span className="text-[8px] text-gray-400" style={{ fontFamily: "'Press Start 2P', monospace" }}>BPM</span>
+            <input
+              type="range" min="60" max="200" value={bpm}
+              onChange={e => setBpm(Number(e.target.value))}
+              className="w-20 accent-primary"
             />
-            <span className="text-sm text-white w-8">{bpm}</span>
+            <span className="text-[10px] text-white w-8" style={{ fontFamily: "'Press Start 2P', monospace" }}>{bpm}</span>
           </div>
-          <PixelButton variant="primary" onClick={() => setIsPlaying(!isPlaying)}>
-            {isPlaying ? <Square size={16} /> : <Play size={16} className="ml-1" />}
-          </PixelButton>
-          <PixelButton variant="secondary" onClick={handleFinish}>
-            FINISH TRACK
-          </PixelButton>
+
+          {/* Play / Stop */}
+          <button
+            onClick={handlePlayToggle}
+            className="px-4 py-2 transition-all duration-100 active:scale-95"
+            style={{
+              background: isPlaying ? '#ff0000' : '#ff00ff',
+              border: `2px solid ${isPlaying ? '#ff8888' : '#ff88ff'}`,
+              boxShadow: `0 0 12px ${isPlaying ? '#ff000088' : '#ff00ff88'}`,
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: '10px',
+              color: '#000',
+            }}
+          >
+            {isPlaying ? '■ STOP' : '▶ PLAY'}
+          </button>
+
+          {/* Finish */}
+          <button
+            onClick={handleFinish}
+            className="px-4 py-2 transition-all duration-100 active:scale-95"
+            style={{
+              background: '#00ffff',
+              border: '2px solid #88ffff',
+              boxShadow: '0 0 12px #00ffff88',
+              fontFamily: "'Press Start 2P', monospace",
+              fontSize: '10px',
+              color: '#000',
+            }}
+          >
+            FINISH →
+          </button>
         </div>
       </div>
 
-      {/* Sequencer Grid */}
-      <div className="flex-1 z-20 flex flex-col gap-2 max-w-6xl w-full mx-auto overflow-x-auto pb-8">
-        <PixelPanel className="bg-black/80 flex flex-col gap-3 min-w-[800px]">
-          
-          <div className="flex pl-32 mb-2">
-            {Array(16).fill(0).map((_, i) => (
-              <div key={i} className="flex-1 text-center text-[8px] text-gray-600">
-                {(i % 4 === 0) ? (i / 4) + 1 : ''}
-              </div>
-            ))}
-          </div>
-
-          {city.instruments.map((inst, trackIdx) => (
-            <div key={inst.id} className="flex items-center h-10 w-full">
-              <div className="w-32 flex items-center pr-4">
-                <div className={`w-3 h-3 ${inst.color} mr-2 pixel-borders`}></div>
-                <span className="text-[10px] text-gray-300 truncate" title={inst.name}>{inst.name}</span>
-              </div>
-              
-              <div className="flex-1 flex gap-1 h-full">
-                {Array(16).fill(0).map((_, stepIdx) => {
-                  const isActive = tracks[trackIdx][stepIdx];
-                  const isCurrent = isPlaying && currentStep === stepIdx;
-                  const isBeat = stepIdx % 4 === 0;
-                  
-                  return (
-                    <div 
-                      key={stepIdx}
-                      onClick={() => toggleStep(trackIdx, stepIdx)}
-                      className={`
-                        flex-1 h-full cursor-pointer transition-all duration-75
-                        ${isActive ? inst.color : isBeat ? 'bg-gray-800' : 'bg-gray-900'}
-                        ${isCurrent ? 'brightness-150 scale-110 z-10 shadow-[0_0_10px_rgba(255,255,255,0.8)]' : ''}
-                        ${isActive ? 'pixel-borders border-opacity-50' : 'border border-gray-800'}
-                        hover:brightness-125
-                      `}
-                    />
-                  );
-                })}
-              </div>
+      {/* ── Sequencer ── */}
+      <div className="relative z-20 flex-1 flex flex-col px-4 py-4 overflow-x-auto">
+        {/* Beat number ruler */}
+        <div className="flex items-center mb-1 pl-36">
+          {Array(16).fill(0).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 text-center text-[7px]"
+              style={{
+                fontFamily: "'Press Start 2P', monospace",
+                color: i % 4 === 0 ? '#ff00ff' : '#333',
+              }}
+            >
+              {i % 4 === 0 ? i / 4 + 1 : '·'}
             </div>
           ))}
-        </PixelPanel>
+        </div>
+
+        {/* Track rows */}
+        <div
+          className="flex flex-col gap-1 min-w-[700px]"
+          style={{ border: '1px solid #333', background: 'rgba(0,0,0,0.7)', padding: '8px' }}
+        >
+          {city.instruments.map((inst, trackIdx) => {
+            const trackColor = BEAT_COLORS[trackIdx % BEAT_COLORS.length];
+            return (
+              <div key={inst.id} className="flex items-center h-9">
+                {/* Label */}
+                <div className="w-36 flex items-center gap-2 pr-2 shrink-0">
+                  <div
+                    className="w-2 h-2 shrink-0"
+                    style={{ background: trackColor, boxShadow: `0 0 4px ${trackColor}` }}
+                  />
+                  <span
+                    className="text-[8px] truncate"
+                    style={{ fontFamily: "'Press Start 2P', monospace", color: trackColor }}
+                    title={inst.name}
+                  >
+                    {inst.name}
+                  </span>
+                </div>
+
+                {/* Step buttons */}
+                <div className="flex-1 flex gap-[2px] h-full">
+                  {Array(16).fill(0).map((_, stepIdx) => {
+                    const isActive = tracks[trackIdx]?.[stepIdx];
+                    const isCurrent = currentStep === stepIdx;
+                    const isDownbeat = stepIdx % 4 === 0;
+
+                    return (
+                      <button
+                        key={stepIdx}
+                        onClick={() => toggleStep(trackIdx, stepIdx)}
+                        className="flex-1 h-full transition-all duration-75"
+                        style={{
+                          background: isActive
+                            ? trackColor
+                            : isCurrent
+                              ? '#222'
+                              : isDownbeat
+                                ? '#111'
+                                : '#0a0a0a',
+                          border: `1px solid ${isActive ? trackColor : isCurrent ? '#555' : '#222'}`,
+                          boxShadow: isActive
+                            ? `0 0 6px ${trackColor}, inset 0 0 4px ${trackColor}88`
+                            : isCurrent
+                              ? '0 0 8px #ffffff44'
+                              : 'none',
+                          transform: isCurrent && isActive ? 'scaleY(1.1)' : 'scaleY(1)',
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Status bar */}
+        <div className="mt-3 flex items-center gap-4">
+          <div
+            className="text-[8px] px-3 py-1 border"
+            style={{
+              fontFamily: "'Press Start 2P', monospace",
+              color: audioReady ? '#00ff88' : '#ffff00',
+              borderColor: audioReady ? '#00ff8844' : '#ffff0044',
+            }}
+          >
+            {audioReady ? '◉ AUDIO READY' : '○ CLICK TO ENABLE AUDIO'}
+          </div>
+          {isPlaying && (
+            <div
+              className="text-[8px] px-3 py-1 border border-primary/40"
+              style={{ fontFamily: "'Press Start 2P', monospace", color: '#ff00ff' }}
+            >
+              ► PLAYING · STEP {currentStep + 1}/16
+            </div>
+          )}
+        </div>
       </div>
-      
-      <PixelButton className="absolute bottom-4 left-4 z-20" size="sm" onClick={() => setLocation('/map')}>
-        BACK TO MAP
-      </PixelButton>
+
+      {/* Back */}
+      <div className="relative z-20 px-4 pb-4">
+        <PixelButton size="sm" onClick={() => setLocation('/map')}>
+          ← MAP
+        </PixelButton>
+      </div>
     </div>
   );
 }

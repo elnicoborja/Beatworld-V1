@@ -16,6 +16,7 @@ export interface CityLevel {
   venue: string;
   mediaOutlet: string;
   emoji: string;
+  defaultBpm?: number;
 }
 
 export const CITIES: Record<string, CityLevel> = {

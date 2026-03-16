@@ -2,12 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { v4 as uuidv4 } from 'uuid';
 import { useSaveGame } from '@workspace/api-client-react';
 
-export type CharacterSprite = {
-  skin: string;
-  hair: string;
-  shirt: string;
-  pants: string;
-};
+export type CharacterSprite = Record<string, string>;
 
 export interface GameState {
   playerId: string;
@@ -35,7 +30,7 @@ const defaultState: GameState = {
   currentCity: null,
   completedCities: [],
   clout: 0,
-  character: { skin: '#ffcc99', hair: '#000000', shirt: '#ff00ff', pants: '#00ffff' },
+  character: { skinTone: 'medium', hairStyle: 'fade', hairColor: '#1a0a00', topStyle: 'hoodie', topColor: '#0050ff', pantsStyle: 'baggy', pantsColor: '#111133', accessory: 'headphones' },
   tracks: {},
 };
 
