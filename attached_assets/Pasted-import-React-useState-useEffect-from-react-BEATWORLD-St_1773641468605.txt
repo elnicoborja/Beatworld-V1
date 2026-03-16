@@ -1,0 +1,357 @@
+import React, { useState, useEffect } from 'react';
+
+// BEATWORLD Strict Color Palette
+const COLORS = {
+  magenta: '#ff00ff',
+  cyan: '#00ffff',
+  yellow: '#ffff00',
+  electricBlue: '#0050ff',
+  red: '#ff0000',
+  green: '#00ff00',
+  hotPink: '#ff00c8',
+  orange: '#ff8800',
+  navy: '#0a0a1a',
+  midNavy: '#111133',
+  white: '#e0e0ff',
+  gray: '#444466',
+  black: '#000000',
+};
+
+// Instrument Cycle Colors (As requested)
+const INSTRUMENT_COLORS = [
+  '#ff00ff', '#00ffff', '#ffff00', '#ff8800', '#00ff00', '#ff0000',
+  '#ff00c8', '#0050ff', '#aaffaa', '#ffaaaa', '#aaaaff', '#ffffaa',
+  '#ff6600', '#00ffcc', '#ff0066', '#66ffff'
+];
+
+const INSTRUMENT_NAMES = [
+  'KICK 808', 'SNARE HARD', 'HIHAT CL', 'HIHAT OP', 
+  'CLAP TR', 'PERC WOOD', 'BASS SUB', 'SYNTH L1', 
+  'SYNTH L2', 'PAD WARM', 'LEAD ACID', 'VOX CUT', 
+  'FX RISER', 'FX IMPCT', 'CRASH 909', 'RIDE CYM'
+];
+
+// Mock City Data (For demonstration)
+const MOCK_CITY = {
+  id: 'LA',
+  name: 'LOS ANGELES',
+  emoji: '🌴',
+  genre: 'G-FUNK',
+  trackNum: 2,
+  trackTotal: 6,
+  defaultBpm: 95,
+  rows: 8 // E.g., LA has 8 rows
+};
+
+export default function StudioScreen() {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [bpm, setBpm] = useState(MOCK_CITY.defaultBpm);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [audioReady, setAudioReady] = useState(false);
+  
+  // Initialize sequencer grid state
+  const [grid, setGrid] = useState<boolean[][]>(
+    Array(MOCK_CITY.rows).fill(null).map(() => Array(16).fill(false))
+  );
+
+  // Playback Engine Simulation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      const msPerBeat = 60000 / bpm;
+      const msPerStep = msPerBeat / 4; // 16th notes
+      interval = setInterval(() => {
+        setCurrentStep((prev) => (prev + 1) % 16);
+      }, msPerStep);
+    } else {
+      setCurrentStep(0); // Reset on stop
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, bpm]);
+
+  const toggleStep = (rowIdx: number, stepIdx: number) => {
+    if (!audioReady) setAudioReady(true);
+    const newGrid = [...grid];
+    newGrid[rowIdx] = [...newGrid[rowIdx]];
+    newGrid[rowIdx][stepIdx] = !newGrid[rowIdx][stepIdx];
+    setGrid(newGrid);
+  };
+
+  const handlePlayToggle = () => {
+    if (!audioReady) setAudioReady(true);
+    setIsPlaying(!isPlaying);
+  };
+
+  return (
+    <div 
+      className="relative flex flex-col w-screen h-screen bg-[#0a0a1a] text-[#e0e0ff] uppercase overflow-hidden font-press-start select-none"
+      onClick={() => { if (!audioReady) setAudioReady(true); }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        .font-press-start {
+          font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Overlays */
+        .scanlines {
+          background: repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 0px,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.1) 2px,
+            rgba(0, 0, 0, 0.1) 4px
+          );
+          pointer-events: none;
+        }
+
+        .grid-overlay {
+          background-image: 
+            linear-gradient(rgba(255, 0, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 255, 0.03) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        /* Custom UI Elements */
+        .pixel-shadow { box-shadow: 3px 3px 0px #000; }
+        
+        .text-glow-magenta { text-shadow: 0 0 8px #ff00ff; }
+        .text-glow-cyan { text-shadow: 0 0 8px #00ffff; }
+        
+        .blinking {
+          animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+
+        /* Custom Range Slider */
+        input[type=range].bpm-slider {
+          -webkit-appearance: none;
+          width: 100%;
+          background: transparent;
+        }
+        input[type=range].bpm-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 12px;
+          width: 12px;
+          background: #ff00ff;
+          cursor: pointer;
+          margin-top: -4px;
+          box-shadow: 0 0 8px #ff00ff;
+        }
+        input[type=range].bpm-slider::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 4px;
+          cursor: pointer;
+          background: #444466;
+        }
+        
+        /* Step Hover Flash */
+        .step-cell:hover {
+          filter: brightness(1.3);
+        }
+        .step-cell:active {
+          filter: brightness(2);
+        }
+      `}</style>
+
+      {/* BACKGROUND SVG (Low Opacity Studio) */}
+      <div className="absolute inset-0 z-0 opacity-[0.08] pointer-events-none flex items-end justify-center">
+        <svg width="100%" height="60%" viewBox="0 0 400 200" preserveAspectRatio="xMidYMax slice" style={{ imageRendering: 'pixelated' }}>
+          {/* Mixing Desk Base */}
+          <rect x="50" y="100" width="300" height="100" fill="#444466" stroke="#0a0a1a" strokeWidth="2" />
+          <rect x="60" y="110" width="280" height="80" fill="#111133" />
+          {/* Faders */}
+          {[...Array(12)].map((_, i) => (
+            <g key={`fader-${i}`} transform={`translate(${80 + i * 20}, 120)`}>
+              <rect x="0" y="0" width="4" height="60" fill="#0a0a1a" />
+              <rect x="-2" y={10 + (i % 3) * 10} width="8" height="12" fill={COLORS.white} />
+            </g>
+          ))}
+          {/* Speakers */}
+          <rect x="20" y="40" width="60" height="80" fill="#111133" stroke="#ff00ff" strokeWidth="2" />
+          <circle cx="50" cy="70" r="15" fill="#0a0a1a" />
+          <circle cx="50" cy="100" r="8" fill="#0a0a1a" />
+          
+          <rect x="320" y="40" width="60" height="80" fill="#111133" stroke="#00ffff" strokeWidth="2" />
+          <circle cx="350" cy="70" r="15" fill="#0a0a1a" />
+          <circle cx="350" cy="100" r="8" fill="#0a0a1a" />
+          
+          {/* Neon Sign */}
+          <rect x="150" y="20" width="100" height="30" fill="none" stroke="#ffff00" strokeWidth="2" />
+          <text x="200" y="42" fill="#ffff00" fontSize="16" fontFamily="'Press Start 2P'" textAnchor="middle">ON AIR</text>
+        </svg>
+      </div>
+
+      {/* OVERLAYS */}
+      <div className="absolute inset-0 z-10 grid-overlay" />
+      <div className="absolute inset-0 z-20 scanlines" />
+
+      {/* MAIN UI (z-30) */}
+      <div className="relative z-30 flex flex-col h-full w-full">
+        
+        {/* Absolute Back Button */}
+        <button className="absolute top-2 left-2 text-[#00ffff] text-[8px] z-50 hover:text-[#ffffff] bg-[#0a0a1a] p-1 border border-[#00ffff]">
+          ← MAP
+        </button>
+
+        {/* HEADER BAR */}
+        <header className="bg-[#111133] border-b-[2px] border-[#ff00ff] px-[24px] py-[12px] flex flex-col md:flex-row justify-between items-center gap-[16px] z-40">
+          
+          {/* Left: City & Info */}
+          <div className="flex flex-col items-center md:items-start ml-0 md:ml-12 mt-4 md:mt-0">
+            <div className="text-[#ff00ff] text-[12px] text-glow-magenta mb-[8px]">
+              {MOCK_CITY.emoji} {MOCK_CITY.name} STUDIO
+            </div>
+            <div className="flex items-center gap-[12px] text-[#00ffff] text-[8px]">
+              <span>{MOCK_CITY.genre}</span>
+              <span className="text-[#444466]">|</span>
+              <span>TRACK {MOCK_CITY.trackNum} OF {MOCK_CITY.trackTotal}</span>
+              <span className="text-[#444466]">|</span>
+              <span className="flex items-center gap-[4px]">
+                BPM: <span className="text-[#ffff00] text-[10px]" style={{ textShadow: '0 0 6px #ffff00' }}>{bpm}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Center: BPM Slider */}
+          <div className="flex flex-col w-[200px] gap-[8px]">
+            <div className="flex justify-between text-[#444466] text-[7px]">
+              <span>60</span>
+              <span className="text-[#00ffff]">TEMPO</span>
+              <span>200</span>
+            </div>
+            <input 
+              type="range" 
+              min="60" 
+              max="200" 
+              value={bpm} 
+              onChange={(e) => setBpm(parseInt(e.target.value))}
+              className="bpm-slider"
+            />
+          </div>
+
+          {/* Right: Controls */}
+          <div className="flex gap-[16px]">
+            <button 
+              onClick={handlePlayToggle}
+              className={`px-[16px] py-[12px] text-[9px] text-[#0a0a1a] border-[2px] pixel-shadow outline-none active:translate-y-[2px] active:translate-x-[2px] active:shadow-[1px_1px_0px_#000] transition-none w-[100px]
+                ${isPlaying ? 'bg-[#ff0000] border-[#ff0000]' : 'bg-[#ff00ff] border-[#ff00ff]'}`}
+            >
+              {isPlaying ? '■ STOP' : '▶ PLAY'}
+            </button>
+            <button className="px-[16px] py-[12px] bg-[#00ffff] text-[#0a0a1a] border-[2px] border-[#00ffff] text-[9px] pixel-shadow outline-none hover:brightness-110 active:translate-y-[2px] active:translate-x-[2px] active:shadow-[1px_1px_0px_#000] transition-none">
+              ✓ FINISH
+            </button>
+          </div>
+        </header>
+
+        {/* BEAT RULER */}
+        <div className="bg-[#0a0a1a] border-b border-[#ff00ff] border-opacity-40 flex px-[24px] py-[4px] z-30">
+          {/* Spacer for Instrument Label */}
+          <div className="w-[140px] flex-shrink-0" />
+          {/* 16 Cells */}
+          <div className="flex flex-grow justify-between gap-[2px]">
+            {[...Array(16)].map((_, i) => {
+              const isBeatMarker = i % 4 === 0;
+              return (
+                <div key={`ruler-${i}`} className="flex-1 flex justify-center items-center min-w-[28px]">
+                  {isBeatMarker ? (
+                    <span className="text-[#ff00ff] text-[7px]">{i + 1}</span>
+                  ) : (
+                    <span className="text-[#444466] text-[7px]">·</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* SEQUENCER GRID */}
+        <main className="flex-1 overflow-y-auto px-[24px] py-[16px] z-30 flex flex-col gap-[4px]">
+          {grid.map((row, rowIdx) => {
+            const instColor = INSTRUMENT_COLORS[rowIdx % INSTRUMENT_COLORS.length];
+            const instName = INSTRUMENT_NAMES[rowIdx % INSTRUMENT_NAMES.length];
+
+            return (
+              <div key={`row-${rowIdx}`} className="flex items-center h-[44px] gap-[8px]">
+                
+                {/* Instrument Label */}
+                <div className="w-[140px] flex-shrink-0 flex items-center gap-[8px] overflow-hidden">
+                  <div 
+                    className="w-[8px] h-[8px] flex-shrink-0" 
+                    style={{ backgroundColor: instColor, boxShadow: `0 0 6px ${instColor}` }} 
+                  />
+                  <span className="text-[#ffffff] text-[7px] truncate" title={instName}>
+                    {instName}
+                  </span>
+                </div>
+
+                {/* Step Cells */}
+                <div className="flex flex-grow justify-between gap-[2px] h-full items-center">
+                  {row.map((isActive, stepIdx) => {
+                    const isDownbeat = stepIdx % 4 === 0;
+                    const isCurrent = isPlaying && currentStep === stepIdx;
+                    
+                    // Determine classes based on state
+                    let bgClass = isActive ? '' : (isDownbeat ? 'bg-[#151530]' : 'bg-[#0d0d22]');
+                    let borderClass = isActive ? '' : 'border-[#1a1a3a] border';
+                    let inlineStyles: React.CSSProperties = {};
+
+                    if (isActive) {
+                      inlineStyles.backgroundColor = instColor;
+                      inlineStyles.border = `2px solid ${instColor}`;
+                      // Use precise shadow styling from prompt
+                      inlineStyles.boxShadow = `inset 0 0 6px rgba(255,255,255,0.3), 0 0 8px ${instColor}`;
+                    }
+
+                    if (isCurrent) {
+                      inlineStyles.outline = '2px solid #ffffff';
+                      inlineStyles.boxShadow = (inlineStyles.boxShadow ? inlineStyles.boxShadow + ', ' : '') + '0 0 12px #ffffff';
+                      // Make outline stand out above adjacent cells
+                      inlineStyles.zIndex = 10; 
+                    }
+
+                    return (
+                      <button
+                        key={`step-${rowIdx}-${stepIdx}`}
+                        onClick={() => toggleStep(rowIdx, stepIdx)}
+                        className={`step-cell flex-1 h-full aspect-square min-w-[28px] min-h-[28px] max-w-[44px] relative transition-none ${bgClass} ${borderClass}`}
+                        style={inlineStyles}
+                        aria-label={`Toggle step ${stepIdx + 1} for ${instName}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </main>
+
+        {/* STATUS BAR */}
+        <footer className="bg-[#111133] border-t-[2px] border-[#ff00ff] px-[24px] py-[8px] flex justify-between items-center z-40 mt-auto flex-shrink-0">
+          <div className="text-[7px]">
+            {audioReady ? (
+              <span className="text-[#00ff00]">◉ AUDIO READY</span>
+            ) : (
+              <span className="text-[#ffff00] blinking">○ CLICK TO ENABLE AUDIO</span>
+            )}
+          </div>
+          
+          <div className="text-[#ff00ff] text-[7px]">
+            {isPlaying ? (
+              <span>► PLAYING · STEP {currentStep + 1}/16</span>
+            ) : (
+              <span className="text-[#444466]">■ STOPPED</span>
+            )}
+          </div>
+        </footer>
+
+      </div>
+    </div>
+  );
+}

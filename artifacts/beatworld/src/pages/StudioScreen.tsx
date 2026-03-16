@@ -4,22 +4,11 @@ import { useGameState } from '@/hooks/use-game-state';
 import { CITIES } from '@/lib/game-data';
 import { audio } from '@/lib/audio';
 
-const IsoBuilding = ({ x, y, width, depth, height, topColor, leftColor, rightColor }: any) => {
-  const pTop = `${x},${y} ${x + width},${y - width * 0.5} ${x + width + depth},${y - width * 0.5 + depth * 0.5} ${x + depth},${y + depth * 0.5}`;
-  const pLeft = `${x},${y} ${x + depth},${y + depth * 0.5} ${x + depth},${y + depth * 0.5 + height} ${x},${y + height}`;
-  const pRight = `${x + depth},${y + depth * 0.5} ${x + width + depth},${y - width * 0.5 + depth * 0.5} ${x + width + depth},${y - width * 0.5 + depth * 0.5 + height} ${x + depth},${y + depth * 0.5 + height}`;
-  return (
-    <g style={{ imageRendering: 'pixelated' }}>
-      <polygon points={pTop} fill={topColor} stroke="#000" strokeWidth="1" />
-      <polygon points={pLeft} fill={leftColor} stroke="#000" strokeWidth="1" />
-      <polygon points={pRight} fill={rightColor} stroke="#000" strokeWidth="1" />
-    </g>
-  );
-};
-
-const LEVEL_ACCENT: Record<number, string> = {
-  1: '#ff00ff', 2: '#ff8800', 3: '#ffff00', 4: '#00ff88', 5: '#00ffff', 6: '#ff0088',
-};
+const INSTRUMENT_COLORS = [
+  '#ff00ff', '#00ffff', '#ffff00', '#ff8800', '#00ff00', '#ff0000',
+  '#ff00c8', '#0050ff', '#aaffaa', '#ffaaaa', '#aaaaff', '#ffffaa',
+  '#ff6600', '#00ffcc', '#ff0066', '#66ffff',
+];
 
 export default function StudioScreen() {
   const { cityId } = useParams();
@@ -39,7 +28,6 @@ export default function StudioScreen() {
   const [bpm, setBpm] = useState(city?.defaultBpm || 120);
   const [currentStep, setCurrentStep] = useState(-1);
   const [audioReady, setAudioReady] = useState(false);
-  const [fxValues, setFxValues] = useState([12, 45, 78]);
 
   const intervalRef = useRef<number | null>(null);
   const stepRef = useRef(0);
@@ -118,283 +106,195 @@ export default function StudioScreen() {
 
   if (!city) return <div className="text-white p-8">City not found</div>;
 
-  const accent = LEVEL_ACCENT[city.level] || '#ff00ff';
-  const TRACK_COLORS = [
-    '#ff00ff','#00ffff','#ffff00','#00ff00',
-    '#ff8800','#0050ff','#ff00c8','#ff0000',
-    '#00ff88','#7744ff','#ff4488','#44aaff',
-    '#ffcc00','#cc00ff','#00ff44','#ff0044',
-  ];
-
   return (
     <div
-      className="min-h-screen bg-[#0a0a1a] text-[#e0e0ff] uppercase overflow-hidden relative select-none p-3 md:p-6 flex flex-col gap-4"
-      style={{ fontFamily: '"Press Start 2P", monospace' }}
+      className="relative flex flex-col w-screen h-screen bg-[#0a0a1a] text-[#e0e0ff] uppercase overflow-hidden select-none"
+      style={{ fontFamily: "'Press Start 2P', monospace" }}
+      onClick={() => { if (!audioReady) ensureAudio(); }}
     >
       <style>{`
-        .crt-overlay {
-          background: repeating-linear-gradient(rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px);
-          pointer-events: none; z-index: 50; position: absolute; inset: 0;
+        .scanlines-st {
+          background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px);
+          pointer-events: none;
         }
-        .grid-overlay {
+        .grid-st {
           background-image: linear-gradient(rgba(255,0,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,0,255,0.03) 1px, transparent 1px);
           background-size: 32px 32px;
-          pointer-events: none; z-index: 10; position: absolute; inset: 0;
+          pointer-events: none;
         }
-        .pixel-shadow { box-shadow: 3px 3px 0px #000; }
-        .text-glow-magenta { text-shadow: 0 0 8px #ff00ff; }
-        .text-glow-cyan { text-shadow: 0 0 8px #00ffff; }
-        .text-glow-yellow { text-shadow: 0 0 8px #ffff00; }
-        input[type=range] { -webkit-appearance: none; background: transparent; }
-        input[type=range]::-webkit-slider-thumb {
-          -webkit-appearance: none; height: 14px; width: 6px;
-          background: #00ffff; border: 2px solid #000; box-shadow: 2px 2px 0px #000;
-          cursor: pointer; margin-top: -5px;
+        input[type=range].bpm-slider { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range].bpm-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; height: 12px; width: 12px; background: #ff00ff; cursor: pointer; margin-top: -4px;
+          box-shadow: 0 0 8px #ff00ff;
         }
-        input[type=range]::-webkit-slider-runnable-track {
-          width: 100%; height: 4px; cursor: pointer; background: #444466; border-bottom: 2px solid #e0e0ff;
-        }
+        input[type=range].bpm-slider::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #444466; }
+        .step-cell:hover { filter: brightness(1.3); }
+        .step-cell:active { filter: brightness(2); }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .blinking { animation: blink 1s step-end infinite; }
       `}</style>
 
-      <div className="crt-overlay" />
-      <div className="grid-overlay" />
+      {/* Background SVG Studio */}
+      <div className="absolute inset-0 z-0 opacity-[0.08] pointer-events-none flex items-end justify-center">
+        <svg width="100%" height="60%" viewBox="0 0 400 200" preserveAspectRatio="xMidYMax slice" style={{ imageRendering: 'pixelated' }}>
+          <rect x="50" y="100" width="300" height="100" fill="#444466" stroke="#0a0a1a" strokeWidth="2" />
+          <rect x="60" y="110" width="280" height="80" fill="#111133" />
+          {[...Array(12)].map((_, i) => (
+            <g key={i} transform={`translate(${80 + i * 20}, 120)`}>
+              <rect x="0" y="0" width="4" height="60" fill="#0a0a1a" />
+              <rect x="-2" y={10 + (i % 3) * 10} width="8" height="12" fill="#e0e0ff" />
+            </g>
+          ))}
+          <rect x="20" y="40" width="60" height="80" fill="#111133" stroke="#ff00ff" strokeWidth="2" />
+          <circle cx="50" cy="70" r="15" fill="#0a0a1a" />
+          <circle cx="50" cy="100" r="8" fill="#0a0a1a" />
+          <rect x="320" y="40" width="60" height="80" fill="#111133" stroke="#00ffff" strokeWidth="2" />
+          <circle cx="350" cy="70" r="15" fill="#0a0a1a" />
+          <circle cx="350" cy="100" r="8" fill="#0a0a1a" />
+          <rect x="150" y="20" width="100" height="30" fill="none" stroke="#ffff00" strokeWidth="2" />
+          <text x="200" y="42" fill="#ffff00" fontSize="16" fontFamily="'Press Start 2P'" textAnchor="middle">ON AIR</text>
+        </svg>
+      </div>
 
-      {/* Header */}
-      <header className="relative z-20 flex flex-col md:flex-row justify-between items-start md:items-end border-b-2 pb-3 gap-3" style={{ borderColor: accent }}>
-        <div>
-          <h1 className="text-2xl md:text-4xl text-glow-magenta pixel-shadow" style={{ color: accent }}>
-            {city.emoji} {city.name.toUpperCase()}
-          </h1>
-          <p className="text-[10px] text-[#00ffff] text-glow-cyan tracking-widest mt-1">
-            SYS.VER: YM2612 // {city.genre.toUpperCase()} · {city.instruments.length} TRACKS
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <div className="bg-[#111133] border-2 border-[#00ffff] p-2 pixel-shadow flex flex-col items-center">
-            <span className="text-[8px] text-[#00ffff] mb-1">CLOUT</span>
-            <span className="text-lg text-[#ffff00] text-glow-yellow">{state.clout.toLocaleString()}</span>
-          </div>
-          <div className="bg-[#111133] border-2 p-2 pixel-shadow flex flex-col items-center" style={{ borderColor: accent }}>
-            <span className="text-[8px] mb-1" style={{ color: accent }}>LEVEL</span>
-            <span className="text-lg text-[#e0e0ff]">{city.level}</span>
-          </div>
-        </div>
-      </header>
+      <div className="absolute inset-0 z-10 grid-st" />
+      <div className="absolute inset-0 z-20 scanlines-st" />
 
-      {/* Main Grid */}
-      <main className="relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 overflow-hidden">
+      <div className="relative z-30 flex flex-col h-full w-full">
+        <button
+          onClick={() => setLocation('/map')}
+          className="absolute top-2 left-2 text-[#00ffff] text-[8px] z-50 hover:text-[#ffffff] bg-[#0a0a1a] p-1 border border-[#00ffff]"
+        >
+          ← MAP
+        </button>
 
-        {/* Left: Transport + Module Tweak */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          {/* Transport */}
-          <div className="bg-[#111133] border-2 border-[#e0e0ff] p-3 pixel-shadow">
-            <h2 className="text-[#00ffff] text-[10px] mb-3 border-b-2 border-[#444466] pb-1">TRANSPORT</h2>
-            <div className="flex gap-3 mb-4">
-              <button
-                onClick={handlePlayToggle}
-                className="flex-1 py-3 border-2 pixel-shadow transition-all active:translate-y-[2px] active:translate-x-[2px] active:shadow-[1px_1px_0px_#000] text-sm"
-                style={{
-                  background: isPlaying ? '#00ff00' : '#ff0000',
-                  borderColor: '#0a0a1a',
-                  color: isPlaying ? '#0a0a1a' : '#e0e0ff',
-                  boxShadow: isPlaying ? '0 0 15px #00ff00, 3px 3px 0px #000' : '3px 3px 0px #000',
-                }}
-              >
-                {isPlaying ? '■ STOP' : '▶ PLAY'}
-              </button>
-              <button
-                onClick={handleFinish}
-                className="flex-1 py-3 border-2 pixel-shadow transition-all active:translate-y-[2px] active:translate-x-[2px] text-sm"
-                style={{
-                  background: '#00ffff',
-                  borderColor: '#0a0a1a',
-                  color: '#0a0a1a',
-                  boxShadow: '0 0 10px #00ffff44, 3px 3px 0px #000',
-                }}
-              >
-                FINISH →
-              </button>
+        {/* HEADER BAR */}
+        <header className="bg-[#111133] border-b-2 border-[#ff00ff] px-6 py-3 flex flex-col md:flex-row justify-between items-center gap-4 z-40">
+          <div className="flex flex-col items-center md:items-start ml-0 md:ml-12 mt-4 md:mt-0">
+            <div className="text-[#ff00ff] text-[12px] mb-2" style={{ textShadow: '0 0 8px #ff00ff' }}>
+              {city.emoji} {city.name.toUpperCase()} STUDIO
             </div>
-
-            <div className="flex justify-between items-center bg-[#0a0a1a] border-2 border-[#444466] p-2 mb-3">
-              <span className="text-[#e0e0ff] text-[9px]">TEMPO</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setBpm(b => Math.max(60, b - 1))} className="text-[#ff00ff] hover:text-[#00ffff] text-xs">◀</button>
-                <span className="text-[#ffff00] text-glow-yellow w-10 text-center text-sm">{bpm}</span>
-                <button onClick={() => setBpm(b => Math.min(200, b + 1))} className="text-[#ff00ff] hover:text-[#00ffff] text-xs">▶</button>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center bg-[#0a0a1a] border-2 border-[#444466] p-2">
-              <span className="text-[#e0e0ff] text-[9px]">SHUFFLE</span>
-              <div className="w-14 h-3 border-2 border-[#444466] relative bg-[#111133]">
-                <div className="absolute left-0 top-0 h-full w-1/3 bg-[#00ffff]" />
-              </div>
-            </div>
-
-            <div className="mt-3 text-[8px] flex items-center gap-2">
-              <div className={`w-2 h-2 ${audioReady ? 'bg-[#00ff00] shadow-[0_0_6px_#00ff00]' : 'bg-[#ffff00]'}`} />
-              <span style={{ color: audioReady ? '#00ff00' : '#ffff00' }}>
-                {audioReady ? 'AUDIO LINK: READY' : 'CLICK TO ENABLE AUDIO'}
+            <div className="flex items-center gap-3 text-[#00ffff] text-[8px]">
+              <span>{city.genre.toUpperCase()}</span>
+              <span className="text-[#444466]">|</span>
+              <span>{city.instruments.length} TRACKS</span>
+              <span className="text-[#444466]">|</span>
+              <span className="flex items-center gap-1">
+                BPM: <span className="text-[#ffff00] text-[10px]" style={{ textShadow: '0 0 6px #ffff00' }}>{bpm}</span>
               </span>
             </div>
           </div>
 
-          {/* Module Tweak */}
-          <div className="bg-[#111133] border-2 border-[#0050ff] p-3 pixel-shadow flex-1">
-            <h2 className="text-[#0050ff] text-[10px] mb-3 border-b-2 border-[#0050ff] pb-1">MODULE TWEAK</h2>
-            <div className="space-y-4">
-              {['DISTORTION', 'RESONANCE', 'CUTOFF'].map((fx, i) => (
-                <div key={fx}>
-                  <div className="flex justify-between text-[8px] mb-1 text-[#00ffff]">
-                    <span>{fx}</span>
-                    <span className="text-[#ff00ff]">{fxValues[i]}%</span>
-                  </div>
-                  <input
-                    type="range" min="0" max="100" value={fxValues[i]}
-                    onChange={e => setFxValues(prev => prev.map((v, j) => j === i ? Number(e.target.value) : v))}
-                    className="w-full"
-                  />
-                </div>
-              ))}
+          <div className="flex flex-col w-[200px] gap-2">
+            <div className="flex justify-between text-[#444466] text-[7px]">
+              <span>60</span>
+              <span className="text-[#00ffff]">TEMPO</span>
+              <span>200</span>
             </div>
-            <div className="mt-6 grid grid-cols-4 gap-1">
-              {[...Array(8)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-2 w-full"
-                  style={{
-                    background: i < Math.ceil(fxValues[0] / 12.5) ? '#ff0000' : '#444466',
-                    boxShadow: i < Math.ceil(fxValues[0] / 12.5) ? '0 0 6px #ff000088' : 'none',
-                  }}
-                />
-              ))}
-            </div>
+            <input
+              type="range" min="60" max="200" value={bpm}
+              onChange={e => setBpm(parseInt(e.target.value))}
+              className="bpm-slider"
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={handlePlayToggle}
+              className={`px-4 py-3 text-[9px] text-[#0a0a1a] border-2 outline-none active:translate-y-[2px] active:translate-x-[2px] transition-none w-[100px] ${isPlaying ? 'bg-[#ff0000] border-[#ff0000]' : 'bg-[#ff00ff] border-[#ff00ff]'}`}
+              style={{ boxShadow: '3px 3px 0px #000' }}
+            >
+              {isPlaying ? '■ STOP' : '▶ PLAY'}
+            </button>
+            <button
+              onClick={handleFinish}
+              className="px-4 py-3 bg-[#00ffff] text-[#0a0a1a] border-2 border-[#00ffff] text-[9px] outline-none hover:brightness-110 active:translate-y-[2px] active:translate-x-[2px] transition-none"
+              style={{ boxShadow: '3px 3px 0px #000' }}
+            >
+              ✓ FINISH
+            </button>
+          </div>
+        </header>
+
+        {/* BEAT RULER */}
+        <div className="bg-[#0a0a1a] border-b border-[#ff00ff] border-opacity-40 flex px-6 py-1 z-30">
+          <div className="w-[140px] flex-shrink-0" />
+          <div className="flex flex-grow justify-between gap-[2px]">
+            {[...Array(16)].map((_, i) => (
+              <div key={i} className="flex-1 flex justify-center items-center min-w-[28px]">
+                {i % 4 === 0 ? (
+                  <span className="text-[#ff00ff] text-[7px]">{i + 1}</span>
+                ) : (
+                  <span className="text-[#444466] text-[7px]">·</span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Right: World Viewer + Sequencer */}
-        <div className="lg:col-span-9 flex flex-col gap-4">
+        {/* SEQUENCER GRID */}
+        <main className="flex-1 overflow-y-auto px-6 py-4 z-30 flex flex-col gap-1">
+          {city.instruments.map((inst, rowIdx) => {
+            const instColor = INSTRUMENT_COLORS[rowIdx % INSTRUMENT_COLORS.length];
+            return (
+              <div key={inst.id} className="flex items-center h-[44px] gap-2">
+                <div className="w-[140px] flex-shrink-0 flex items-center gap-2 overflow-hidden">
+                  <div className="w-2 h-2 flex-shrink-0" style={{ backgroundColor: instColor, boxShadow: `0 0 6px ${instColor}` }} />
+                  <span className="text-[#ffffff] text-[7px] truncate">{inst.name.toUpperCase()}</span>
+                </div>
 
-          {/* Isometric World Viewer */}
-          <div className="bg-[#111133] border-2 border-[#ff00ff] p-1 pixel-shadow relative h-40 md:h-52 overflow-hidden">
-            <div className="absolute top-2 left-2 z-10 bg-[#0a0a1a] border-2 border-[#ff00ff] px-2 py-1 text-[8px] text-[#ff00ff] text-glow-magenta pixel-shadow">
-              LIVE: {city.venue.toUpperCase()}
-            </div>
-            <svg width="100%" height="100%" viewBox="0 0 300 150" className="bg-[#0a0a1a]">
-              <defs>
-                <pattern id="isoGrid" width="20" height="10" patternUnits="userSpaceOnUse">
-                  <path d="M 10 0 L 20 5 L 10 10 L 0 5 Z" fill="none" stroke="#111133" strokeWidth="0.5" />
-                </pattern>
-                <filter id="neonGlowM"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-                <filter id="neonGlowC"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#isoGrid)" />
-              <g transform="translate(150, 70)">
-                <IsoBuilding x={-60} y={10} width={30} depth={30} height={15} topColor="#111133" leftColor="#0050ff" rightColor="#0a0a1a" />
-                <IsoBuilding x={-40} y={0} width={40} depth={40} height={20} topColor="#111133" leftColor="#0050ff" rightColor="#0a0a1a" />
-                <IsoBuilding x={0} y={0} width={40} depth={40} height={20} topColor="#111133" leftColor="#444466" rightColor="#0a0a1a" />
-                <IsoBuilding x={40} y={10} width={25} depth={25} height={12} topColor="#111133" leftColor="#444466" rightColor="#0a0a1a" />
-                <IsoBuilding x={-20} y={-20} width={20} depth={20} height={40} topColor={accent} leftColor="#ff00c8" rightColor="#444466" />
-                <IsoBuilding x={0} y={-20} width={20} depth={20} height={30} topColor="#00ffff" leftColor="#0a0a1a" rightColor="#0050ff" />
-                <IsoBuilding x={-50} y={-10} width={15} depth={15} height={25} topColor="#ffff00" leftColor="#444466" rightColor="#0a0a1a" />
-                <polygon points="-20,-20 -20,-40 -10,-35 -10,-15" fill="#ffff00" filter="url(#neonGlowM)" />
-                <polygon points="10,-15 10,-30 20,-25 20,-10" fill="#00ffff" filter="url(#neonGlowC)" />
-                <polygon points="-50,-10 -45,-12 -40,-10 -45,-8" fill="#ff0000" filter="url(#neonGlowM)">
-                  <animateTransform attributeName="transform" type="translate" from="0 0" to="100 -50" dur="4s" repeatCount="indefinite" />
-                </polygon>
-                <polygon points="30,20 35,18 40,20 35,22" fill="#00ff00" filter="url(#neonGlowC)">
-                  <animateTransform attributeName="transform" type="translate" from="0 0" to="-80 -40" dur="6s" repeatCount="indefinite" />
-                </polygon>
-              </g>
-            </svg>
-            <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px] pointer-events-none" />
+                <div className="flex flex-grow justify-between gap-[2px] h-full items-center">
+                  {Array(16).fill(0).map((_, stepIdx) => {
+                    const isActive = tracks[rowIdx]?.[stepIdx];
+                    const isDownbeat = stepIdx % 4 === 0;
+                    const isCurrent = isPlaying && currentStep === stepIdx;
 
-            {isPlaying && (
-              <div className="absolute bottom-2 right-2 z-10 bg-[#0a0a1a] border-2 border-[#00ff00] px-2 py-1 text-[8px] text-[#00ff00] pixel-shadow">
-                ► STEP {currentStep + 1}/16
+                    const style: React.CSSProperties = {};
+                    if (isActive) {
+                      style.backgroundColor = instColor;
+                      style.border = `2px solid ${instColor}`;
+                      style.boxShadow = `inset 0 0 6px rgba(255,255,255,0.3), 0 0 8px ${instColor}`;
+                    }
+                    if (isCurrent) {
+                      style.outline = '2px solid #ffffff';
+                      style.boxShadow = (style.boxShadow ? style.boxShadow + ', ' : '') + '0 0 12px #ffffff';
+                      style.zIndex = 10;
+                    }
+
+                    return (
+                      <button
+                        key={stepIdx}
+                        onClick={() => toggleStep(rowIdx, stepIdx)}
+                        className={`step-cell flex-1 h-full min-w-[28px] min-h-[28px] max-w-[44px] relative transition-none ${
+                          isActive ? '' : isDownbeat ? 'bg-[#151530]' : 'bg-[#0d0d22]'
+                        } ${isActive ? '' : 'border border-[#1a1a3a]'}`}
+                        style={style}
+                      />
+                    );
+                  })}
+                </div>
               </div>
+            );
+          })}
+        </main>
+
+        {/* STATUS BAR */}
+        <footer className="bg-[#111133] border-t-2 border-[#ff00ff] px-6 py-2 flex justify-between items-center z-40 mt-auto flex-shrink-0">
+          <div className="text-[7px]">
+            {audioReady ? (
+              <span className="text-[#00ff00]">◉ AUDIO READY</span>
+            ) : (
+              <span className="text-[#ffff00] blinking">○ CLICK TO ENABLE AUDIO</span>
             )}
           </div>
-
-          {/* Sequencer */}
-          <div className="bg-[#111133] border-2 border-[#e0e0ff] p-3 pixel-shadow flex-1 overflow-y-auto">
-            <div className="flex justify-between items-end mb-3 border-b-2 border-[#444466] pb-1">
-              <h2 className="text-[#00ffff] text-[10px]">PATTERN SEQ</h2>
-              <div className="hidden md:flex gap-[2px] text-[7px] text-[#444466]">
-                {[...Array(16)].map((_, i) => (
-                  <div key={i} className="w-7 text-center" style={{ color: i % 4 === 0 ? '#e0e0ff' : '#444466' }}>
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {city.instruments.map((inst, tIdx) => {
-                const tColor = TRACK_COLORS[tIdx % TRACK_COLORS.length];
-                return (
-                  <div key={inst.id} className="flex flex-col md:flex-row items-start md:items-center gap-2">
-                    {/* Track info */}
-                    <div className="flex items-center gap-2 w-full md:w-40 bg-[#0a0a1a] border-2 border-[#444466] p-1.5 shrink-0">
-                      <div className="flex flex-col gap-[2px] mr-1">
-                        <button className="w-3 h-3 bg-[#ff0000] border border-[#000] text-[5px] flex items-center justify-center hover:bg-[#ff00c8]">M</button>
-                        <button className="w-3 h-3 bg-[#ffff00] border border-[#000] text-[5px] flex items-center justify-center text-[#000] hover:bg-[#fff]">S</button>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[8px] mb-0.5 truncate" style={{ color: tColor }}>{inst.name}</div>
-                        <input type="range" min="0" max="100" defaultValue={75} className="w-full h-1" />
-                      </div>
-                    </div>
-
-                    {/* Step buttons */}
-                    <div className="flex gap-[2px] flex-1 overflow-x-auto pb-1 md:pb-0">
-                      {Array(16).fill(0).map((_, sIdx) => {
-                        const isActive = tracks[tIdx]?.[sIdx];
-                        const isCurrent = currentStep === sIdx;
-                        const isDownbeat = sIdx % 4 === 0;
-
-                        return (
-                          <button
-                            key={sIdx}
-                            onClick={() => toggleStep(tIdx, sIdx)}
-                            className="relative flex-1 min-w-[20px] h-8 md:h-10 flex-shrink-0 border-2 transition-none"
-                            style={{
-                              backgroundColor: isActive ? tColor : isDownbeat ? '#1a1a3a' : '#0a0a1a',
-                              borderColor: isActive ? '#fff' : isCurrent ? '#ffffff' : '#444466',
-                              boxShadow: isActive
-                                ? `0 0 10px ${tColor}, inset 2px 2px 0 rgba(255,255,255,0.4)`
-                                : isCurrent
-                                  ? '0 0 8px #ffffff44'
-                                  : 'inset 2px 2px 0 rgba(0,0,0,0.5)',
-                              outline: isCurrent ? '2px solid #fff' : 'none',
-                              outlineOffset: '-1px',
-                            }}
-                          >
-                            <div
-                              className="absolute top-[2px] left-1/2 -translate-x-1/2 w-2 h-[2px]"
-                              style={{ background: isActive ? '#fff' : '#000' }}
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="text-[#ff00ff] text-[7px]">
+            {isPlaying ? (
+              <span>► PLAYING · STEP {currentStep + 1}/16</span>
+            ) : (
+              <span className="text-[#444466]">■ STOPPED</span>
+            )}
           </div>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="relative z-20 flex justify-between items-center text-[7px] text-[#444466]">
-        <button onClick={() => setLocation('/map')} className="text-[#0050ff] hover:text-[#00ffff] text-[8px]">
-          ← BACK TO MAP
-        </button>
-        <div>BEATWORLD V1.0 · PIXEL ENGINE ACTIVE</div>
-        <div>MEM: 640K OK</div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }
