@@ -1,0 +1,273 @@
+import React, { useState } from 'react';
+
+// BEATWORLD Strict Color Palette
+const COLORS = {
+  magenta: '#ff00ff',
+  cyan: '#00ffff',
+  yellow: '#ffff00',
+  electricBlue: '#0050ff',
+  red: '#ff0000',
+  green: '#00ff00',
+  hotPink: '#ff00c8',
+  orange: '#ff8800',
+  navy: '#0a0a1a',
+  midNavy: '#111133',
+  white: '#e0e0ff',
+  gray: '#444466',
+  black: '#000000',
+};
+
+// Level Definitions
+const LEVELS = {
+  L1: { color: COLORS.magenta, name: 'L1 HIP HOP' },
+  L2: { color: COLORS.orange, name: 'L2 REGGAETON' },
+  L3: { color: COLORS.yellow, name: 'L3 BAILE FUNK' },
+  L4: { color: COLORS.green, name: 'L4 CUMBIA / TRAP' },
+  L5: { color: COLORS.cyan, name: 'L5 CORRIDOS / ELECTRONIC' },
+  L6: { color: COLORS.hotPink, name: 'L6 TECHNO / HOUSE' },
+};
+
+// City Data
+const CITIES = [
+  // L1
+  { id: 'NY', name: 'NEW YORK', genre: 'BOOM BAP', top: 28, left: 22, level: 'L1', status: 'UNLOCKED' },
+  { id: 'LA', name: 'LOS ANGELES', genre: 'G-FUNK', top: 28, left: 12, level: 'L1', status: 'CURRENT' },
+  // L2
+  { id: 'PR', name: 'PUERTO RICO', genre: 'REGGAETON', top: 35, left: 28, level: 'L2', status: 'LOCKED' },
+  { id: 'SD', name: 'SANTO DOMINGO', genre: 'DEMBOW', top: 36, left: 27, level: 'L2', status: 'LOCKED' },
+  { id: 'MDE', name: 'MEDELLIN', genre: 'NEOPERREO', top: 44, left: 23, level: 'L2', status: 'LOCKED' },
+  // L3
+  { id: 'RIO', name: 'RIO DE JANEIRO', genre: 'BAILE FUNK', top: 60, left: 30, level: 'L3', status: 'LOCKED' },
+  { id: 'FOR', name: 'FORTALEZA', genre: 'PISADINHA', top: 55, left: 33, level: 'L3', status: 'LOCKED' },
+  { id: 'SP', name: 'SAO PAULO', genre: 'MANDELAO', top: 62, left: 28, level: 'L3', status: 'LOCKED' },
+  // L4
+  { id: 'BOG', name: 'BOGOTA', genre: 'GUARACHA', top: 45, left: 22, level: 'L4', status: 'LOCKED' },
+  { id: 'BA', name: 'BUENOS AIRES', genre: 'RKT / TRAP', top: 70, left: 25, level: 'L4', status: 'LOCKED' },
+  { id: 'SCL', name: 'SANTIAGO', genre: 'MAMBO', top: 70, left: 21, level: 'L4', status: 'LOCKED' },
+  // L5
+  { id: 'CDMX', name: 'MEXICO CITY', genre: 'PERREO UNDE', top: 33, left: 16, level: 'L5', status: 'LOCKED' },
+  { id: 'MTY', name: 'MONTERREY', genre: 'CUMBIA REBAJADA', top: 30, left: 16, level: 'L5', status: 'LOCKED' },
+  { id: 'TLM', name: 'TULUM', genre: 'TRIBAL HOUSE', top: 34, left: 19, level: 'L5', status: 'LOCKED' },
+  // L6
+  { id: 'BER', name: 'BERLIN', genre: 'TECHNO', top: 22, left: 50, level: 'L6', status: 'LOCKED' },
+  { id: 'LDN', name: 'LONDON', genre: 'UK DRILL / GRIME', top: 22, left: 46, level: 'L6', status: 'LOCKED' },
+  { id: 'NCL', name: 'NEWCASTLE', genre: 'BASSLINE', top: 20, left: 46, level: 'L6', status: 'LOCKED' },
+  { id: 'BRI', name: 'BRIGHTON', genre: 'UKG', top: 23, left: 46, level: 'L6', status: 'LOCKED' },
+];
+
+export default function WorldMap() {
+  const [hoveredCity, setHoveredCity] = useState<string | null>(null);
+
+  return (
+    <div className="relative w-screen h-screen bg-[#0a0a1a] text-[#e0e0ff] uppercase overflow-hidden font-press-start select-none">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        .font-press-start {
+          font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Overlays */
+        .scanlines {
+          background: repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 0px,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.1) 2px,
+            rgba(0, 0, 0, 0.1) 4px
+          );
+          pointer-events: none;
+        }
+
+        .grid-overlay {
+          background-image: 
+            linear-gradient(rgba(255, 0, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 255, 0.03) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        .radial-vignette {
+          background: radial-gradient(circle at center, transparent 20%, rgba(10, 10, 26, 0.9) 100%);
+          pointer-events: none;
+        }
+
+        /* Shadows & Glows */
+        .pixel-shadow { box-shadow: 3px 3px 0px #000; }
+        
+        @keyframes pinPulse {
+          0%, 100% { transform: translate(-50%, -50%) scale(1.3); }
+          50% { transform: translate(-50%, -50%) scale(1.6); }
+        }
+        .animate-pin-pulse {
+          animation: pinPulse 1s infinite ease-in-out;
+        }
+      `}</style>
+
+      {/* LAYER 1 & 2: Base & World Map SVG */}
+      <div className="absolute inset-0 z-0 bg-[#050518]">
+        <svg width="100%" height="100%" preserveAspectRatio="none" style={{ imageRendering: 'pixelated' }}>
+          <defs>
+            <pattern id="landPattern" width="2" height="2" patternUnits="userSpaceOnUse">
+              <rect width="2" height="2" fill="#1a2a3a" />
+              <rect width="1" height="1" fill="#15202d" />
+            </pattern>
+          </defs>
+          
+          {/* North America Impressionistic Blocks */}
+          <g fill="url(#landPattern)">
+            <rect x="5%" y="10%" width="30%" height="5%" />
+            <rect x="8%" y="15%" width="25%" height="10%" />
+            <rect x="10%" y="25%" width="20%" height="8%" />
+            <rect x="12%" y="33%" width="10%" height="5%" />
+            <rect x="15%" y="38%" width="12%" height="4%" />
+          </g>
+
+          {/* South America */}
+          <g fill="url(#landPattern)">
+            <rect x="20%" y="42%" width="10%" height="8%" />
+            <rect x="22%" y="50%" width="14%" height="12%" />
+            <rect x="24%" y="62%" width="8%" height="10%" />
+            <rect x="25%" y="72%" width="4%" height="10%" />
+          </g>
+
+          {/* Europe */}
+          <g fill="url(#landPattern)">
+            <rect x="42%" y="15%" width="15%" height="5%" />
+            <rect x="45%" y="20%" width="12%" height="8%" />
+            <rect x="40%" y="28%" width="18%" height="6%" />
+            <rect x="46%" y="22%" width="4%" height="4%" /> {/* UK block */}
+          </g>
+
+          {/* Africa */}
+          <g fill="url(#landPattern)">
+            <rect x="42%" y="35%" width="16%" height="10%" />
+            <rect x="45%" y="45%" width="14%" height="12%" />
+            <rect x="48%" y="57%" width="10%" height="15%" />
+          </g>
+        </svg>
+      </div>
+
+      {/* LAYER 3: Radial Vignette */}
+      <div className="absolute inset-0 z-10 radial-vignette" />
+
+      {/* LAYER 4: Grid Overlay */}
+      <div className="absolute inset-0 z-20 grid-overlay" />
+
+      {/* LAYER 5: Scanlines */}
+      <div className="absolute inset-0 z-30 scanlines" />
+
+      {/* CITY PINS (z-40 so they are clickable above overlays) */}
+      <div className="absolute inset-0 z-40">
+        {CITIES.map((city) => {
+          const isLocked = city.status === 'LOCKED';
+          const isCurrent = city.status === 'CURRENT';
+          const levelColor = LEVELS[city.level as keyof typeof LEVELS].color;
+          const isHovered = hoveredCity === city.id;
+
+          return (
+            <div
+              key={city.id}
+              className="absolute group"
+              style={{ top: `${city.top}%`, left: `${city.left}%` }}
+              onMouseEnter={() => setHoveredCity(city.id)}
+              onMouseLeave={() => setHoveredCity(null)}
+            >
+              {/* Pin Graphics */}
+              <div 
+                className={`
+                  absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2
+                  flex items-center justify-center w-[16px] h-[16px] border-[2px]
+                  ${isLocked ? 'cursor-not-allowed opacity-50 border-[#444466]' : 'cursor-pointer'}
+                  ${isCurrent ? 'animate-pin-pulse' : ''}
+                `}
+                style={{
+                  borderColor: isLocked ? COLORS.gray : levelColor,
+                  boxShadow: isLocked ? 'none' : `0 0 8px ${levelColor}, inset 0 0 4px ${levelColor}`,
+                  backgroundColor: 'transparent'
+                }}
+              >
+                {/* Inner Dot */}
+                <div 
+                  className="w-[6px] h-[6px]"
+                  style={{ backgroundColor: isLocked ? '#222244' : levelColor }}
+                />
+              </div>
+
+              {/* Hover Tooltip */}
+              {isHovered && (
+                <div 
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 whitespace-nowrap bg-[#111133] pixel-shadow z-50 flex flex-col gap-[6px] p-[8px] px-[12px] border pointer-events-none"
+                  style={{ borderColor: levelColor }}
+                >
+                  <div className="text-[#ffffff] text-[7px]">
+                    🌆 {city.name}
+                  </div>
+                  <div className="text-[#00ffff] text-[7px]">
+                    {city.genre}
+                  </div>
+                  <div className={`text-[7px] ${isLocked ? 'text-[#444466]' : 'text-[#00ff00]'}`}>
+                    {isLocked ? '🔒 LOCKED' : '✓ AVAILABLE'}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* HUD ELEMENTS (z-50) */}
+      
+      {/* Top-Left HUD */}
+      <div className="absolute top-[24px] left-[24px] z-50 bg-[#111133] border-2 border-[#ff00ff] p-[12px] px-[16px] pixel-shadow flex flex-col gap-[8px]">
+        <div className="text-[#ff00ff] text-[10px]" style={{ textShadow: '0 0 8px #ff00ff' }}>
+          BEATWORLD MAP
+        </div>
+        <div className="text-[#00ffff] text-[7px]">
+          CLICK A CITY TO ENTER STUDIO
+        </div>
+      </div>
+
+      {/* Top-Right HUD */}
+      <div className="absolute top-[24px] right-[24px] z-50 flex flex-col md:flex-row gap-[16px]">
+        <div className="bg-[#111133] border-2 border-[#ffff00] p-[12px] px-[16px] pixel-shadow flex flex-col gap-[6px]">
+          <div className="text-[#888888] text-[7px]">PRODUCER</div>
+          <div className="text-[#ffff00] text-[9px]">DJ YM2612</div>
+        </div>
+        <div className="bg-[#111133] border-2 border-[#ffff00] p-[12px] px-[16px] pixel-shadow flex flex-col gap-[6px]">
+          <div className="text-[#888888] text-[7px]">CLOUT</div>
+          <div className="text-[#ffff00] text-[9px]" style={{ textShadow: '0 0 10px #ffff00' }}>
+            009402
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom-Center Buttons */}
+      <div className="absolute bottom-[24px] left-1/2 -translate-x-1/2 z-50 flex gap-[16px]">
+        <button className="bg-[#00ffff] text-[#0a0a1a] text-[9px] px-[20px] py-[12px] uppercase outline-none hover:brightness-110 active:translate-y-[2px] active:translate-x-[2px] transition-none" style={{ boxShadow: '3px 3px 0px #000' }}>
+          GRAMMCHAT
+        </button>
+        <button className="bg-[#ffff00] text-[#0a0a1a] text-[9px] px-[20px] py-[12px] uppercase outline-none hover:brightness-110 active:translate-y-[2px] active:translate-x-[2px] transition-none" style={{ boxShadow: '3px 3px 0px #000' }}>
+          LEADERBOARD
+        </button>
+      </div>
+
+      {/* Bottom-Right Legend */}
+      <div className="absolute bottom-[24px] right-[24px] z-50 bg-[#111133] bg-opacity-90 border border-[#444466] p-[12px] pixel-shadow flex flex-col gap-[8px]">
+        <div className="text-[#ffffff] text-[7px] mb-[4px]">LEVELS</div>
+        {Object.values(LEVELS).map((level) => (
+          <div key={level.name} className="flex items-center gap-[8px]">
+            <div 
+              className="w-[8px] h-[8px] border border-[#0a0a1a]" 
+              style={{ backgroundColor: level.color }}
+            />
+            <div className="text-[7px]" style={{ color: level.color }}>
+              {level.name}
+            </div>
+          </div>
+        ))}
+      </div>
+
+    </div>
+  );
+}
