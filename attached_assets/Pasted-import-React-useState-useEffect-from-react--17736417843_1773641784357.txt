@@ -1,0 +1,353 @@
+import React, { useState, useEffect } from 'react';
+
+// ============================================================================
+// COLOR PALETTE & CONSTANTS
+// ============================================================================
+const C = {
+  skyBlue: '#87ceeb',
+  cream: '#fff8e7',
+  hotPink: '#ff3399',
+  magenta: '#cc0066',
+  yellow: '#ffee00',
+  cobalt: '#0050cc',
+  brick: '#cc3300',
+  lime: '#44cc00',
+  orange: '#ff8800',
+  teal: '#00aaaa',
+  purple: '#6600cc',
+  black: '#111111',
+  gray: '#888899',
+  asphalt: '#334455',
+  tan: '#d4a97a'
+};
+
+const AVATAR = {
+  skin: { face: '#f1c27d', shadow: '#c8903a', depth: '#b07830' }, // Medium
+  top: { base: '#ff3399', dark: '#cc297a', light: '#ff66b3', seam: '#e62e8a' }, // Hot Pink top
+  pants: { base: '#0050cc', dark: '#0040a3', seam: '#00307a' }, // Cobalt pants
+  hair: '#ffee00', // Yellow hair
+};
+
+const DRUMS = ['KICK', 'SNARE', 'HIHAT', 'PERC'];
+
+export default function BeatworldUI() {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [bpm, setBpm] = useState(120);
+  
+  // 4 tracks, 16 steps
+  const [grid, setGrid] = useState<boolean[][]>(
+    [
+      [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+      [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+      [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
+      [false, false, true, false, false, true, false, false, false, false, true, false, false, true, false, false]
+    ]
+  );
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      const msPerBeat = 60000 / bpm;
+      const msPerStep = msPerBeat / 4; 
+      interval = setInterval(() => {
+        setCurrentStep((prev) => (prev + 1) % 16);
+      }, msPerStep);
+    } else {
+      setCurrentStep(0);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, bpm]);
+
+  const toggleStep = (trackIdx: number, stepIdx: number) => {
+    const newGrid = [...grid];
+    newGrid[trackIdx][stepIdx] = !newGrid[trackIdx][stepIdx];
+    setGrid(newGrid);
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden selection:bg-[#ff3399] selection:text-[#fff8e7]" style={{ backgroundColor: C.skyBlue, fontFamily: '"Press Start 2P", monospace', color: C.black }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        /* OVERLAYS & TEXTURES */
+        .iso-grid {
+          position: absolute;
+          inset: 0;
+          background-image: 
+            linear-gradient(30deg, rgba(17,17,17,0.08) 1px, transparent 1px),
+            linear-gradient(150deg, rgba(17,17,17,0.08) 1px, transparent 1px);
+          background-size: 32px 18px;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .halftone-overlay {
+          position: absolute;
+          inset: 0;
+          background-image: radial-gradient(circle, rgba(17,17,17,0.12) 1px, transparent 1px);
+          background-size: 6px 6px;
+          pointer-events: none;
+        }
+
+        /* GRAFFITI TITLE */
+        .graffiti-title {
+          font-size: 32px;
+          color: #ff3399; /* Fallback */
+          background: linear-gradient(135deg, #ffaacc 0%, #ff3399 60%, #cc0066 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          filter: drop-shadow(3px 4px 0px #cc0066) drop-shadow(2px 2px 0px #111111) drop-shadow(-2px -2px 0px #111111) drop-shadow(0px 8px 0px rgba(102, 0, 204, 0.5));
+          line-height: 1.2;
+          transform: rotate(-2deg);
+        }
+
+        /* UI CHROME - PANELS */
+        .bw-panel {
+          background-color: ${C.cream};
+          border: 2px solid ${C.black};
+          box-shadow: 4px 4px 0px ${C.black};
+          position: relative;
+        }
+
+        /* UI CHROME - BUTTONS */
+        .bw-btn {
+          background-color: ${C.hotPink};
+          color: ${C.cream};
+          border: 2px solid ${C.black};
+          border-top: 2px solid ${C.hotPink}; /* Overridden by box-shadow bevel below */
+          box-shadow: 
+            inset 0 2px 0 rgba(255,255,255,0.4), 
+            inset 0 -2px 0 rgba(0,0,0,0.2),
+            3px 3px 0px ${C.black};
+          text-transform: uppercase;
+          transition: transform 0.05s, box-shadow 0.05s;
+          cursor: pointer;
+        }
+        .bw-btn:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 
+            inset 0 2px 0 rgba(255,255,255,0.4), 
+            inset 0 -2px 0 rgba(0,0,0,0.2),
+            4px 4px 0px ${C.black};
+          filter: brightness(1.1);
+        }
+        .bw-btn:active {
+          transform: translate(2px, 2px);
+          box-shadow: 
+            inset 0 2px 0 rgba(255,255,255,0.4), 
+            inset 0 -2px 0 rgba(0,0,0,0.2),
+            1px 1px 0px ${C.black};
+        }
+
+        /* HARDWARE SEQUENCER CELLS */
+        .seq-cell {
+          width: 100%;
+          aspect-ratio: 1;
+          background-color: #1a3a6a;
+          border: 1px solid #0d2244;
+          box-shadow: inset 1px 1px 0 #2a5a9a, inset -1px -1px 0 #0a1a3a;
+          cursor: pointer;
+          position: relative;
+        }
+        .seq-cell.active {
+          background-color: #ddaa00;
+          border: 1px solid #aa8800;
+          box-shadow: inset 0 0 4px #ffdd44;
+        }
+        .seq-cell.current {
+          outline: 2px solid #ffffff;
+          box-shadow: 0 0 8px #ffffff, inset 0 0 4px #ffdd44;
+          z-index: 10;
+        }
+        
+        /* LED TEXT */
+        .led-text {
+          color: ${C.yellow};
+          text-shadow: 0 0 6px ${C.yellow};
+          font-variant-numeric: tabular-nums;
+        }
+      `}</style>
+
+      {/* SVG Grain Filter Definition */}
+      <svg className="hidden">
+        <filter id="grain">
+          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+        </filter>
+      </svg>
+      
+      {/* Background Layers */}
+      <div className="iso-grid" />
+      <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.08] mix-blend-multiply" style={{ filter: 'url(#grain)' }} />
+
+      {/* MAIN CONTENT WRAPPER */}
+      <div className="relative z-10 flex flex-col md:flex-row gap-6 p-4 md:p-8 max-w-7xl mx-auto min-h-screen">
+        
+        {/* LEFT COLUMN: Profile & Stats */}
+        <div className="w-full md:w-1/3 lg:w-1/4 flex flex-col gap-6">
+          
+          {/* Logo Area */}
+          <div className="mb-4 text-center md:text-left">
+            <h1 className="graffiti-title m-0">BEAT<br/>WORLD</h1>
+          </div>
+
+          {/* Producer Card */}
+          <div className="bw-panel p-4 flex flex-col items-center">
+            <div className="halftone-overlay" />
+            <div className="relative z-10 w-full">
+              
+              <div className="bg-[#87ceeb] border-2 border-[#111111] h-48 w-full flex items-end justify-center relative overflow-hidden shadow-[inset_0_4px_12px_rgba(0,0,0,0.1)] mb-4">
+                {/* Isometric Base Shadow */}
+                <div className="absolute bottom-4 w-20 h-6 bg-[#6600cc] opacity-20 rounded-[100%] blur-[2px]" />
+                
+                {/* AVATAR SVG (16x32 spec) */}
+                <svg viewBox="0 0 16 32" className="h-40 w-auto relative z-10" style={{ imageRendering: 'pixelated' }}>
+                  {/* HEAD (y: 0-7) */}
+                  <rect x="3" y="1" width="10" height="6" fill={AVATAR.hair} />
+                  <rect x="2" y="1" width="10" height="6" fill={AVATAR.skin.face} />
+                  <rect x="2" y="0" width="10" height="2" fill={AVATAR.hair} />
+                  {/* Eyes */}
+                  <rect x="4" y="3" width="2" height="2" fill={C.black} />
+                  <rect x="8" y="3" width="2" height="2" fill={C.black} />
+                  {/* Nose & Mouth */}
+                  <rect x="6" y="4" width="1" height="1" fill={AVATAR.skin.shadow} />
+                  <rect x="5" y="5" width="3" height="1" fill={C.brick} />
+                  
+                  {/* NECK */}
+                  <rect x="5" y="7" width="5" height="2" fill={AVATAR.skin.face} />
+
+                  {/* TORSO (y: 9-20) */}
+                  <rect x="2" y="9" width="12" height="11" fill={AVATAR.top.base} />
+                  <rect x="1" y="10" width="2" height="10" fill={AVATAR.top.dark} />
+                  <rect x="2" y="9" width="12" height="1" fill={AVATAR.top.light} />
+                  <rect x="7" y="9" width="1" height="11" fill={AVATAR.top.seam} />
+
+                  {/* LEFT ARM */}
+                  <rect x="0" y="10" width="3" height="9" fill={AVATAR.top.base} />
+                  <rect x="0" y="18" width="3" height="3" fill={AVATAR.skin.face} />
+
+                  {/* RIGHT ARM */}
+                  <rect x="13" y="10" width="3" height="9" fill={AVATAR.top.base} />
+                  <rect x="13" y="18" width="3" height="3" fill={AVATAR.skin.face} />
+
+                  {/* WAISTBAND */}
+                  <rect x="2" y="20" width="12" height="2" fill={AVATAR.pants.dark} />
+
+                  {/* PANTS */}
+                  <rect x="2" y="22" width="5" height="7" fill={AVATAR.pants.base} />
+                  <rect x="8" y="22" width="5" height="7" fill={AVATAR.pants.base} />
+                  <rect x="1" y="23" width="2" height="6" fill={AVATAR.pants.dark} />
+                  <rect x="7" y="22" width="1" height="7" fill={AVATAR.pants.seam} />
+
+                  {/* SHOES */}
+                  <rect x="1" y="29" width="6" height="3" fill="#222244" />
+                  <rect x="7" y="29" width="6" height="3" fill="#222244" />
+                  <rect x="1" y="31" width="6" height="1" fill={C.black} />
+                  <rect x="7" y="31" width="6" height="1" fill={C.black} />
+
+                  {/* ACCESSORY: Sunglasses */}
+                  <rect x="3" y="3" width="3" height="2" fill="#000088" opacity="0.85" />
+                  <rect x="8" y="3" width="3" height="2" fill="#000088" opacity="0.85" />
+                  <rect x="6" y="3" width="2" height="1" fill="#aaaaaa" />
+
+                  {/* ACCESSORY: Gold Chain */}
+                  <rect x="4" y="12" width="7" height="1" fill="#ffdd00" />
+                  <rect x="5" y="13" width="5" height="1" fill="#ffaa00" />
+                  <rect x="6" y="14" width="2" height="2" fill="#ffdd00" />
+                </svg>
+              </div>
+
+              <div className="bg-[#111111] text-[#fff8e7] p-2 border-2 border-[#111111] mb-2 text-center text-[10px]">
+                DJ PIXELBOY
+              </div>
+              <div className="flex justify-between items-center text-[8px] border-b-2 border-[#111] pb-2 mb-2">
+                <span className="text-[#888899]">LEVEL</span>
+                <span className="text-[#cc0066]">4. BOGOTA</span>
+              </div>
+              <div className="flex justify-between items-center text-[8px]">
+                <span className="text-[#888899]">HYPE</span>
+                <span className="led-text text-[10px]">99420</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN: Sequencer Hardware */}
+        <div className="flex-1 flex flex-col">
+          
+          <div className="bg-[#0050cc] border-2 border-[#111] shadow-[8px_8px_0px_#111] p-2 md:p-4 flex-1 flex flex-col">
+            
+            {/* Hardware Top Dashboard */}
+            <div className="bg-[#fff8e7] border-2 border-[#111] p-3 mb-4 flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="halftone-overlay" />
+              <div className="relative z-10 flex gap-4 w-full md:w-auto">
+                <button 
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="bw-btn px-6 py-4 text-[10px] w-full md:w-auto"
+                  style={{ backgroundColor: isPlaying ? C.brick : C.lime, borderTopColor: isPlaying ? '#ff6666' : '#88ff44' }}
+                >
+                  {isPlaying ? 'STOP ■' : 'PLAY ▶'}
+                </button>
+              </div>
+
+              <div className="relative z-10 flex items-center gap-4 bg-[#111] p-2 border-2 border-[#888899]">
+                <span className="text-[#888899] text-[8px]">TEMPO</span>
+                <button onClick={() => setBpm(b => Math.max(60, b - 1))} className="text-[#ff3399] hover:text-[#fff]">◀</button>
+                <span className="led-text text-[14px] w-12 text-center">{bpm}</span>
+                <button onClick={() => setBpm(b => Math.min(200, b + 1))} className="text-[#ff3399] hover:text-[#fff]">▶</button>
+              </div>
+            </div>
+
+            {/* Hardware Sequencer Grid */}
+            <div className="bg-[#0d1a33] border-2 border-[#111] p-2 flex-1 flex flex-col gap-1">
+              
+              {/* Beat Ruler */}
+              <div className="flex pl-[80px] md:pl-[120px] mb-2">
+                {[...Array(16)].map((_, i) => (
+                  <div key={`ruler-${i}`} className="flex-1 text-center text-[6px] md:text-[8px] text-[#888899]">
+                    {i % 4 === 0 ? <span className="text-[#ff3399]">{i + 1}</span> : '·'}
+                  </div>
+                ))}
+              </div>
+
+              {/* Tracks */}
+              {grid.map((track, trackIdx) => (
+                <div key={`track-${trackIdx}`} className={`flex items-stretch gap-2 p-1 ${trackIdx % 2 === 0 ? 'bg-[#111f3a]' : 'bg-[#0d1a33]'}`}>
+                  
+                  {/* Channel Label */}
+                  <div className="w-[70px] md:w-[110px] flex-shrink-0 bg-[#003399] border border-[#111] flex items-center px-2 shadow-[inset_1px_1px_0_#0050cc]">
+                    <span className="text-[#fff8e7] text-[6px] md:text-[8px] truncate">
+                      {DRUMS[trackIdx]}
+                    </span>
+                  </div>
+
+                  {/* Steps */}
+                  <div className="flex flex-1 gap-1">
+                    {track.map((isActive, stepIdx) => {
+                      const isCurrent = isPlaying && currentStep === stepIdx;
+                      return (
+                        <div 
+                          key={`step-${trackIdx}-${stepIdx}`}
+                          onClick={() => toggleStep(trackIdx, stepIdx)}
+                          className={`seq-cell ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Bottom Branding */}
+            <div className="mt-4 text-right text-[#fff8e7] text-[8px] opacity-80">
+              SYS: BEATWORLD // VOLT-909
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
