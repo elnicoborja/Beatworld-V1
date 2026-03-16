@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "BeatWorld"
+version = "1.0.0"
+id = "artifacts/beatworld"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 24339
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/beatworld run dev"
+
+[services.env]
+PORT = "24339"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/beatworld", "run", "build"]
+publicDir = "artifacts/beatworld/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

@@ -1,0 +1,30 @@
+packages:
+  "three": "Required for 3D world map rendering"
+  "@react-three/fiber": "React renderer for Three.js"
+  "@react-three/drei": "Useful helpers for React Three Fiber"
+  "framer-motion": "Animations for UI, performance screen, and transitions"
+  "uuid": "For generating unique player IDs"
+  "@types/uuid": "Types for uuid"
+  "html2canvas": "For capturing track screenshots"
+  "canvas-confetti": "Fallback for html2canvas to ensure robust screenshots"
+
+images:
+  - path: "artifacts/beatworld/public/images/map-backdrop.png"
+    description: "eboy style isometric pixel art of a dark cyberpunk globe or world map background, vibrant neon cyan and magenta lines"
+    aspect_ratio: "16:9"
+  - path: "artifacts/beatworld/public/images/studio-bg.png"
+    description: "retro 8-bit pixel art of an underground music studio with synths, monitors, glowing LED lights, dark neon aesthetic"
+    aspect_ratio: "16:9"
+  - path: "artifacts/beatworld/public/images/venue-bg.png"
+    description: "8-bit pixel art of a massive crowded music festival at night with giant speakers, laser lights and neon colors"
+    aspect_ratio: "16:9"
+  - path: "artifacts/beatworld/public/images/critic-1.png"
+    description: "16x16 pixel art face of a snobby music critic wearing sunglasses, neon cyberpunk colors"
+    aspect_ratio: "1:1"
+  - path: "artifacts/beatworld/public/images/critic-2.png"
+    description: "16x16 pixel art face of an enthusiastic cool music producer with headphones"
+    aspect_ratio: "1:1"
+
+notes:
+  - App requires AudioContext; browsers require user interaction before playing audio, handle accordingly in the UI
+  - Social APIs will use the generated api-client-react hooks

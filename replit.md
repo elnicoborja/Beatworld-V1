@@ -1,8 +1,8 @@
-# Workspace
+# BeatWorld — Global 8-Bit Producer Game
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A pixel art music production game built with React + Vite, Three.js, Web Audio API, and a PostgreSQL backend. Players travel the world producing genre-specific beats, performing at iconic venues, and building clout on the in-game social platform GRAMMCHAT.
 
 ## Stack
 
@@ -10,87 +10,95 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **API framework**: Express 5
+- **Frontend**: React + Vite (artifacts/beatworld)
+- **API framework**: Express 5 (artifacts/api-server)
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **3D/Graphics**: Three.js / @react-three/fiber (world map)
+- **Audio**: Web Audio API (8-bit synthesized instruments)
+- **Animations**: Framer Motion
+- **Styling**: Tailwind CSS + Press Start 2P pixel font
+
+## Game Structure
+
+### Levels & Cities
+- **Level 1**: Hip Hop — New York (4 tracks), Los Angeles (6 tracks)
+- **Level 2**: Reggaeton/Dembow — Puerto Rico (6), Santo Domingo (8), Medellín (8)
+- **Level 3**: Baile Funk / Psytrance / Minimal Techno — Rio (8), Fortaleza (10), São Paulo (10)
+- **Level 4**: DnB / Tech House / Trap — Bogotá (10), Buenos Aires (12), Santiago (12)
+- **Level 5**: Cumbia / Tribal / Organic House — Mexico City (12), Monterrey (14), Tulum (14)
+- **Level 6 (Final)**: Techno / DnB / Jungle / Broken Beat — Berlin (14), London (14), Newcastle (16), Brighton (16)
+
+### Game Flow
+1. Start Screen → Character Creator → World Map
+2. Click city → Studio (beat sequencer) → Performance at venue → Media review
+3. Post to GRAMMCHAT social platform → earn CLOUT → leaderboard
 
 ## Structure
 
 ```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+artifacts/
+├── beatworld/              # Main game frontend (React + Vite)
+│   └── src/
+│       ├── App.tsx         # Router + providers
+│       ├── index.css       # Pixel art theme (dark navy, neon colors)
+│       ├── lib/
+│       │   ├── game-data.ts # All cities, genres, instruments
+│       │   └── audio.ts     # Web Audio API 8-bit engine
+│       ├── hooks/
+│       │   └── use-game-state.tsx # GameContext + localStorage persistence
+│       ├── components/
+│       │   ├── map/WorldMap.tsx   # 2D world map with city pins
+│       │   └── ui/PixelButton.tsx, PixelPanel.tsx
+│       └── pages/
+│           ├── StartScreen.tsx
+│           ├── CharacterCreator.tsx
+│           ├── MapScreen.tsx
+│           ├── StudioScreen.tsx   # Beat sequencer
+│           ├── PerformanceScreen.tsx
+│           ├── ReviewScreen.tsx
+│           ├── SocialScreen.tsx   # GRAMMCHAT
+│           └── LeaderboardScreen.tsx
+├── api-server/             # Express API server
+└── mockup-sandbox/         # Design prototyping
+lib/
+├── api-spec/openapi.yaml   # API contract
+├── api-client-react/       # Generated React Query hooks
+├── api-zod/                # Generated Zod schemas
+└── db/src/schema/index.ts  # DB: game_saves, social_posts, post_ratings
 ```
 
-## TypeScript & Composite Projects
+## Data Architecture
+- Game state saved in **localStorage** (`beatworld_save`) for offline play
+- Server-side persistence for cloud saves via `POST /api/game/save`
+- Social features (posts, ratings, leaderboard) via API + PostgreSQL
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+## Visual Design
+- **Font**: Press Start 2P (Google Fonts)
+- **Background**: Dark navy (#0a0a1a)
+- **Primary**: Neon Magenta
+- **Secondary**: Neon Cyan
+- **Accent**: Neon Yellow
+- **Levels**: Each level has a distinct neon color on the world map
+- **Aesthetic**: eboy.com isometric pixel art influence
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+## Audio System
+- Web Audio API: oscillators (square, sawtooth, triangle, sine)
+- Kick: frequency sweep from 150Hz → near zero
+- Snare: noise burst + triangle oscillator
+- Hi-Hat: band-pass filtered noise
+- Bass/Lead/Pad: pitch-based oscillators using minor pentatonic scale
 
 ## Root Scripts
+- `pnpm run build` — runs `typecheck` first, then recursively runs `build`
+- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly`
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
-
-## Packages
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
-
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
-
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+## API Endpoints
+- `GET /api/healthz` — health check
+- `POST /api/game/save` — save game state
+- `GET /api/game/load/:playerId` — load game state
+- `GET /api/social/posts` — list GRAMMCHAT posts
+- `POST /api/social/posts` — create post
+- `POST /api/social/posts/:id/rate` — rate a post (1-5 stars)
+- `GET /api/social/leaderboard` — clout leaderboard
