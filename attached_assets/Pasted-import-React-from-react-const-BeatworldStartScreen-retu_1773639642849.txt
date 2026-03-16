@@ -1,0 +1,262 @@
+import React from 'react';
+const BeatworldStartScreen = () => {
+return (
+<div
+className="w-full h-full bg-[#0A0A1A] font-['Press Start 2P'] uppercase text-[#E0E0FF] relative overflow-hidden"
+style={{
+imageRendering: 'pixelated',
+fontSmoothing: 'none',
+WebkitFontSmoothing: 'none',
+aspectRatio: '16/9',
+}}
+>
+<style>{`
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.6;
+      }
+    }
+
+    .pulse {
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .blink {
+      animation: blink 0.5s step-end infinite;
+    }
+  `}</style>
+
+  {/* Grid Overlay */}
+  <div
+    className="absolute inset-0 z-10 pointer-events-none"
+    style={{
+      backgroundImage: 'linear-gradient(#FF00FF 1px, transparent 1px), linear-gradient(90deg, #FF00FF 1px, transparent 1px)',
+      backgroundSize: '32px 32px',
+      opacity: 0.03,
+    }}
+  ></div>
+
+  {/* CRT Scanlines */}
+  <div
+    className="absolute inset-0 z-20 pointer-events-none"
+    style={{
+      backgroundImage: 'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0px, rgba(0, 0, 0, 0.1) 1px, transparent 1px, transparent 2px)',
+    }}
+  ></div>
+
+  {/* Isometric Cityscape Background (SVG Clusters) */}
+  <svg className="absolute inset-0 w-full h-full z-0 opacity-80" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+    {/* Foundation Blocks */}
+    <rect x="0" y="700" width="1600" height="200" fill="#0A0A1A" />
+    <rect x="0" y="600" width="1600" height="100" fill="#111133" />
+
+    {/* Level 1 Buildings */}
+    <rect x="100" y="600" width="200" height="300" fill="#111133" stroke="#0050FF" strokeWidth="2" />
+    <rect x="110" y="610" width="10" height="10" fill="#FFFF00" />
+    <rect x="130" y="610" width="10" height="10" fill="#FFFF00" />
+    <rect x="150" y="610" width="10" height="10" fill="#00FFFF" />
+    <rect x="110" y="630" width="10" height="10" fill="#FFFF00" />
+    <rect x="110" y="650" width="10" height="10" fill="#FFFF00" />
+
+    <rect x="350" y="550" width="150" height="350" fill="#111133" stroke="#0050FF" strokeWidth="2" />
+    <rect x="360" y="560" width="10" height="10" fill="#FFFF00" />
+    <rect x="380" y="560" width="10" height="10" fill="#FF8800" />
+    <rect x="400" y="560" width="10" height="10" fill="#FFFF00" />
+
+    {/* Level 2 Cities / Club Districts */}
+    <rect x="600" y="450" width="400" height="450" fill="#111133" stroke="#FF8800" strokeWidth="2" />
+    <rect x="620" y="470" width="30" height="30" fill="#FF8800" />
+    <rect x="670" y="470" width="30" height="30" fill="#FF00FF" />
+    <rect x="720" y="470" width="30" height="30" fill="#00FFFF" />
+    <rect x="770" y="470" width="30" height="30" fill="#FFFF00" />
+    <rect x="820" y="470" width="30" height="30" fill="#FF00FF" />
+    <rect x="870" y="470" width="30" height="30" fill="#00FFFF" />
+    <rect x="920" y="470" width="30" height="30" fill="#FFFF00" />
+    <rect x="610" y="510" width="380" height="2" fill="#FF8800" />
+
+    {/* Synth / Cassette inspired building */}
+    <rect x="1100" y="500" width="250" height="400" fill="#111133" stroke="#00FFFF" strokeWidth="2" />
+    <rect x="1120" y="520" width="80" height="20" fill="#00FFFF" />
+    <rect x="1220" y="520" width="20" height="20" fill="#00FFFF" />
+    <rect x="1120" y="550" width="210" height="30" fill="#111133" stroke="#00FFFF" strokeWidth="1" />
+    <rect x="1130" y="560" width="10" height="10" fill="#00FFFF" />
+    <rect x="1150" y="560" width="10" height="10" fill="#00FFFF" />
+    <rect x="1170" y="560" width="10" height="10" fill="#00FFFF" />
+    <rect x="1190" y="560" width="10" height="10" fill="#00FFFF" />
+
+    {/* Rooftop Speakers & Towers */}
+    <rect x="150" y="570" width="30" height="30" fill="#0050FF" />
+    <circle cx="165" cy="585" r="10" fill="#00FFFF" stroke="#E0E0FF" strokeWidth="1" />
+    <rect x="190" y="570" width="30" height="30" fill="#0050FF" />
+    <circle cx="205" cy="585" r="10" fill="#00FFFF" stroke="#E0E0FF" strokeWidth="1" />
+
+    <rect x="900" y="350" width="10" height="100" fill="#0050FF" />
+    <rect x="895" y="340" width="20" height="10" fill="#00FFFF" stroke="#E0E0FF" strokeWidth="1" />
+    <rect x="898" y="330" width="14" height="10" fill="#FF00FF" stroke="#E0E0FF" strokeWidth="1" />
+
+    {/* Billboards */}
+    <rect x="1200" y="400" width="150" height="80" fill="#111133" stroke="#FF00FF" strokeWidth="2" />
+    <text x="1215" y="445" fill="#FF00FF" fontSize="16" fontFamily="'Press Start 2P', cursive">GROOVE DISTRICT</text>
+
+    {/* Wires */}
+    <line x1="200" y1="600" x2="600" y2="450" stroke="#0050FF" strokeWidth="2" />
+    <line x1="900" y1="450" x2="1100" y2="500" stroke="#0050FF" strokeWidth="2" />
+    <line x1="300" y1="700" x2="600" y2="900" stroke="#0050FF" strokeWidth="2" />
+    <line x1="1350" y1="700" x2="1600" y2="900" stroke="#0050FF" strokeWidth="2" />
+  </svg>
+
+  {/* Main UI Layer */}
+  <div className="absolute inset-0 z-30 flex flex-col items-center justify-between p-8">
+    {/* Center Top: Logo */}
+    <div className="text-center mt-12">
+      <h1
+        className="text-8xl text-[#FF00FF] p-4 bg-[#0A0A1A]"
+        style={{
+          textShadow: '0 0 8px #FF00C8',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        BEATWORLD
+      </h1>
+      <p
+        className="mt-6 text-xl text-[#E0E0FF]"
+        style={{
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        BUILD THE CITY. DROP THE BEAT.
+      </p>
+    </div>
+
+    {/* Center Buttons */}
+    <div className="flex flex-col items-center space-y-8 mb-24">
+      <button
+        className="w-96 p-8 bg-[#111133] text-[#00FFFF] text-3xl hover:text-[#FFFF00] focus:text-[#FFFF00] active:text-[#FF0000] transition-colors"
+        style={{
+          border: '2px solid #00FFFF',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        START
+      </button>
+      <button
+        className="w-96 p-8 bg-[#111133] text-[#0050FF] text-3xl hover:text-[#00FFFF] transition-colors"
+        style={{
+          border: '2px solid #0050FF',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        LOAD
+      </button>
+      <button
+        className="w-96 p-8 bg-[#111133] text-[#0050FF] text-3xl hover:text-[#00FFFF] transition-colors"
+        style={{
+          border: '2px solid #0050FF',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        OPTIONS
+      </button>
+    </div>
+
+    {/* Bottom UI Row */}
+    <div className="w-full flex justify-between items-end">
+      {/* Status Panel (Bottom Left) */}
+      <div
+        className="bg-[#111133] p-4 text-xs space-y-1.5"
+        style={{
+          border: '2px solid #0050FF',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        <p className="flex items-center gap-2">AUDIO LINK: <span className="text-[#00FF00]">READY</span></p>
+        <p>CITY SEED: BX-2099</p>
+        <p>VERSION: ALPHA 0.1</p>
+      </div>
+
+      {/* Equalizer (Integrated into background city shape, or as UI) */}
+      <div
+        className="w-[400px] h-10 bg-[#111133] flex items-end p-1 space-x-0.5"
+        style={{
+          border: '2px solid #0050FF',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        {[
+          { height: '100%', color: '#00FFFF' },
+          { height: '80%', color: '#00FFFF' },
+          { height: '60%', color: '#00FFFF' },
+          { height: '90%', color: '#00FFFF' },
+          { height: '75%', color: '#0050FF' },
+          { height: '85%', color: '#0050FF' },
+          { height: '95%', color: '#FF00FF' },
+          { height: '70%', color: '#FF00FF' },
+          { height: '65%', color: '#FF00FF' },
+          { height: '80%', color: '#FF00FF' },
+          { height: '90%', color: '#00FFFF' },
+          { height: '100%', color: '#00FFFF' },
+        ].map((bar, index) => (
+          <div
+            key={index}
+            className="flex-1"
+            style={{
+              height: bar.height,
+              backgroundColor: bar.color,
+              boxShadow: '3px 3px 0px #000',
+            }}
+          ></div>
+        ))}
+      </div>
+
+      {/* Info Panel (Bottom Right) */}
+      <div
+        className="bg-[#111133] p-4 text-xs"
+        style={{
+          border: '2px solid #0050FF',
+          boxShadow: '3px 3px 0px #000',
+        }}
+      >
+        <p className="blink">PRESS START TO ENTER STUDIO DISTRICT</p>
+      </div>
+    </div>
+  </div>
+
+  {/* Top UI Row */}
+  <div className="absolute top-0 right-0 p-8 z-30">
+    {/* Player Slot Panel */}
+    <div
+      className="bg-[#111133] p-3 text-xs flex flex-col items-center gap-1.5"
+      style={{
+        border: '2px solid #00FFFF',
+        boxShadow: '3px 3px 0px #000',
+      }}
+    >
+      <div className="w-6 h-6 bg-[#0050FF] flex items-center justify-center">
+        <svg viewBox="0 0 10 10" className="w-4 h-4" fill="#00FFFF">
+          <rect x="0" y="0" width="10" height="2" />
+          <rect x="0" y="4" width="10" height="2" />
+          <rect x="0" y="8" width="10" height="2" />
+        </svg>
+      </div>
+      <p>PLAYER 1</p>
+      <p className="text-[#444466]">OFFLINE</p>
+    </div>
+  </div>
+</div>
+
+);
+};
+export default BeatworldStartScreen;
