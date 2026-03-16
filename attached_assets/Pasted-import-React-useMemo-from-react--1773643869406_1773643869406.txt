@@ -1,7 +1,8 @@
-import { useLocation } from 'wouter';
-import { useGetLeaderboard } from '@workspace/api-client-react';
-import { useGameState } from '@/hooks/use-game-state';
+import React, { useMemo } from 'react';
 
+// ============================================================================
+// COLOR PALETTE & CONSTANTS
+// ============================================================================
 const C = {
   cream: '#fff8e7',
   creamDark: '#fff0d0',
@@ -19,23 +20,46 @@ const C = {
   goldShadow: '#cc6600',
 };
 
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+const LEADERBOARD_DATA = [
+  { rank: 1, name: 'DJ METRO', cities: 18, clout: 942000, isCurrent: false, avatarTop: '#0050cc' },
+  { rank: 2, name: 'SONIC BOOM', cities: 15, clout: 850500, isCurrent: false, avatarTop: '#ff8800' },
+  { rank: 3, name: 'KILLA K', cities: 12, clout: 710000, isCurrent: false, avatarTop: '#44cc00' },
+  { rank: 4, name: 'DJ PIXELBOY', cities: 8, clout: 540200, isCurrent: true, avatarTop: '#ff3399' },
+  { rank: 5, name: 'BEATMASTER', cities: 6, clout: 420000, isCurrent: false, avatarTop: '#00aaaa' },
+  { rank: 6, name: 'WUBWUB', cities: 4, clout: 210000, isCurrent: false, avatarTop: '#cc3300' },
+  { rank: 7, name: 'SYS_ERROR', cities: 2, clout: 95000, isCurrent: false, avatarTop: '#6600cc' },
+];
+
+// ============================================================================
+// SVG COMPONENTS (STRICTLY <rect> ONLY)
+// ============================================================================
+
 const TrophySvg = () => (
   <svg viewBox="0 0 48 48" width="48" height="48" style={{ imageRendering: 'pixelated' }}>
+    {/* Base */}
     <rect x="12" y="40" width="24" height="6" fill={C.goldDark} />
     <rect x="16" y="34" width="16" height="6" fill={C.goldDark} />
     <rect x="20" y="28" width="8" height="6" fill={C.goldDark} />
+    {/* Cup Body */}
     <rect x="18" y="24" width="12" height="4" fill="#ffdd00" />
     <rect x="14" y="16" width="20" height="8" fill="#ffdd00" />
+    {/* Cup Rim */}
     <rect x="12" y="12" width="24" height="4" fill="#ffee44" />
+    {/* Left Handle */}
     <rect x="6" y="14" width="8" height="4" fill="#ddbb00" />
     <rect x="6" y="18" width="4" height="8" fill="#ddbb00" />
     <rect x="6" y="26" width="12" height="4" fill="#ddbb00" />
+    {/* Right Handle */}
     <rect x="34" y="14" width="8" height="4" fill="#ddbb00" />
     <rect x="38" y="18" width="4" height="8" fill="#ddbb00" />
     <rect x="30" y="26" width="12" height="4" fill="#ddbb00" />
+    {/* Pixel outlines / details */}
     <rect x="14" y="40" width="2" height="6" fill="#111" opacity="0.3" />
     <rect x="32" y="40" width="2" height="6" fill="#111" opacity="0.3" />
-    <rect x="16" y="18" width="4" height="6" fill="#fff" opacity="0.4" />
+    <rect x="16" y="18" width="4" height="6" fill="#fff" opacity="0.4" /> {/* Highlight */}
   </svg>
 );
 
@@ -45,6 +69,7 @@ const CrownSvg = ({ color }: { color: string }) => (
     <rect x="1" y="3" width="1" height="3" fill={color} />
     <rect x="3" y="2" width="2" height="4" fill={color} />
     <rect x="6" y="3" width="1" height="3" fill={color} />
+    {/* Jewel dots */}
     <rect x="1" y="4" width="1" height="1" fill="#fff" />
     <rect x="3" y="3" width="1" height="1" fill="#fff" />
     <rect x="6" y="4" width="1" height="1" fill="#fff" />
@@ -53,8 +78,10 @@ const CrownSvg = ({ color }: { color: string }) => (
 
 const MedalSvg = ({ color }: { color: string }) => (
   <svg viewBox="0 0 8 8" width="16" height="16" style={{ imageRendering: 'pixelated' }}>
+    {/* Ribbon */}
     <rect x="2" y="0" width="2" height="4" fill="#cc3300" />
     <rect x="4" y="0" width="2" height="4" fill="#ffffff" />
+    {/* Medal */}
     <rect x="2" y="4" width="4" height="4" fill={color} />
     <rect x="3" y="5" width="2" height="2" fill="#fff" opacity="0.4" />
   </svg>
@@ -65,6 +92,7 @@ const CityIconSvg = () => (
     <rect x="1" y="4" width="2" height="4" fill={C.cobalt} />
     <rect x="3" y="2" width="3" height="6" fill={C.cobalt} />
     <rect x="6" y="5" width="2" height="3" fill={C.cobalt} />
+    {/* Windows */}
     <rect x="4" y="3" width="1" height="1" fill="#fff" />
     <rect x="4" y="5" width="1" height="1" fill="#fff" />
     <rect x="1" y="5" width="1" height="1" fill="#fff" />
@@ -73,69 +101,40 @@ const CityIconSvg = () => (
 
 const MiniSpriteSvg = ({ topColor }: { topColor: string }) => (
   <svg viewBox="0 0 16 32" width="24" height="48" style={{ imageRendering: 'pixelated' }}>
+    {/* Skin base */}
     <rect x="2" y="1" width="10" height="8" fill="#f1c27d" />
     <rect x="4" y="3" width="2" height="2" fill="#111" />
     <rect x="8" y="3" width="2" height="2" fill="#111" />
+    {/* Hair */}
     <rect x="3" y="0" width="8" height="2" fill="#111" />
     <rect x="2" y="1" width="2" height="3" fill="#111" />
+    {/* Torso */}
     <rect x="2" y="9" width="12" height="11" fill={topColor} />
-    <rect x="1" y="10" width="2" height="10" fill="#000" opacity="0.2" />
+    <rect x="1" y="10" width="2" height="10" fill="#000" opacity="0.2" /> {/* Depth */}
+    {/* Arms */}
     <rect x="0" y="10" width="3" height="9" fill={topColor} />
     <rect x="13" y="10" width="3" height="9" fill={topColor} />
     <rect x="0" y="18" width="3" height="3" fill="#f1c27d" />
     <rect x="13" y="18" width="3" height="3" fill="#f1c27d" />
+    {/* Pants */}
     <rect x="2" y="20" width="12" height="9" fill="#334455" />
     <rect x="7" y="20" width="1" height="9" fill="#111" opacity="0.3" />
+    {/* Shoes */}
     <rect x="1" y="29" width="6" height="3" fill="#111" />
     <rect x="7" y="29" width="6" height="3" fill="#111" />
   </svg>
 );
 
-interface LeaderEntry {
-  rank: number;
-  name: string;
-  cities: number;
-  clout: number;
-  isCurrent: boolean;
-  avatarTop: string;
-}
-
-const FALLBACK_DATA: LeaderEntry[] = [
-  { rank: 1, name: 'DJ METRO', cities: 18, clout: 942000, isCurrent: false, avatarTop: '#0050cc' },
-  { rank: 2, name: 'SONIC BOOM', cities: 15, clout: 850500, isCurrent: false, avatarTop: '#ff8800' },
-  { rank: 3, name: 'KILLA K', cities: 12, clout: 710000, isCurrent: false, avatarTop: '#44cc00' },
-  { rank: 5, name: 'BEATMASTER', cities: 6, clout: 420000, isCurrent: false, avatarTop: '#00aaaa' },
-  { rank: 6, name: 'WUBWUB', cities: 4, clout: 210000, isCurrent: false, avatarTop: '#cc3300' },
-  { rank: 7, name: 'SYS_ERROR', cities: 2, clout: 95000, isCurrent: false, avatarTop: '#6600cc' },
-];
-
-const formatClout = (num: number) => num.toLocaleString('en-US');
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function LeaderboardScreen() {
-  const [, setLocation] = useLocation();
-  const { state } = useGameState();
-  const { data } = useGetLeaderboard();
-
-  const serverEntries = data?.entries ?? [];
-
-  const allEntries: LeaderEntry[] = (() => {
-    if (serverEntries.length > 0) {
-      return serverEntries.map((e, i) => ({
-        rank: i + 1,
-        name: e.playerName,
-        cities: e.completedCities,
-        clout: e.clout,
-        isCurrent: e.playerId === state.playerId,
-        avatarTop: '#0050cc',
-      }));
-    }
-    const playerEntry: LeaderEntry = {
-      rank: 4, name: state.playerName.toUpperCase(), cities: state.completedCities.length,
-      clout: state.clout, isCurrent: true, avatarTop: state.character?.topColor || '#ff3399',
-    };
-    const merged = [...FALLBACK_DATA.slice(0, 3), playerEntry, ...FALLBACK_DATA.slice(3)];
-    return merged.map((e, i) => ({ ...e, rank: i + 1 }));
-  })();
+  
+  // Format numbers with commas and pad to at least 6 digits if needed
+  const formatClout = (num: number) => {
+    return num.toLocaleString('en-US');
+  };
 
   return (
     <div className="min-h-screen w-full relative font-press-start uppercase select-none overflow-x-hidden pb-[60px]" style={{ backgroundColor: C.yellow, color: C.black }}>
@@ -143,25 +142,59 @@ export default function LeaderboardScreen() {
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         .font-press-start { font-family: 'Press Start 2P', monospace; }
 
+        /* GRAIN OVERLAY */
         .grain-overlay {
-          position: fixed; inset: 0; pointer-events: none; z-index: 50; opacity: 0.08;
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          z-index: 50;
+          opacity: 0.08;
           mix-blend-mode: multiply;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
-        .bw-table-container { background-color: ${C.cream}; border: 3px solid ${C.black}; box-shadow: 6px 6px 0 ${C.black}; }
-        .bw-row { border-bottom: 1px solid #ddccaa; transition: background-color 0.1s; }
-        .bw-row:hover:not(.current-player) { background-color: rgba(255, 238, 0, 0.26); }
-        .bw-row:last-child { border-bottom: none; }
-        .current-player { background-color: rgba(255, 51, 153, 0.13); border-left: 4px solid ${C.hotPink}; }
+        /* BUBBLE GRAFFITI TITLE */
+        .graffiti-title-lg {
+          font-size: 36px;
+          line-height: 1.2;
+          transform: rotate(-2deg);
+        }
 
+        /* TABLE COMPONENTS */
+        .bw-table-container {
+          background-color: ${C.cream};
+          border: 3px solid ${C.black};
+          box-shadow: 6px 6px 0 ${C.black};
+        }
+        .bw-row {
+          border-bottom: 1px solid #ddccaa;
+          transition: background-color 0.1s;
+        }
+        .bw-row:hover:not(.current-player) {
+          background-color: rgba(255, 238, 0, 0.26); /* #ffee0044 */
+        }
+        .bw-row:last-child {
+          border-bottom: none;
+        }
+        
+        /* CURRENT PLAYER ROW */
+        .current-player {
+          background-color: rgba(255, 51, 153, 0.13); /* #ff339922 */
+          border-left: 4px solid ${C.hotPink};
+        }
+
+        /* BUTTONS */
         .bw-btn {
-          border: 2px solid ${C.black}; box-shadow: 4px 4px 0 ${C.black};
-          transition: transform 0.05s, box-shadow 0.05s, filter 0.05s; cursor: pointer; display: inline-block;
+          border: 2px solid ${C.black};
+          box-shadow: 4px 4px 0 ${C.black};
+          transition: transform 0.05s, box-shadow 0.05s, filter 0.05s;
+          cursor: pointer;
+          display: inline-block;
         }
         .bw-btn:hover { filter: brightness(1.1); transform: translate(-1px, -1px); box-shadow: 5px 5px 0 ${C.black}; }
         .bw-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 ${C.black}; }
 
+        /* GLOWS */
         .glow-yellow { text-shadow: 0 0 8px ${C.yellow}; }
         .glow-yellow-box { box-shadow: 0 0 8px ${C.yellow}; }
       `}</style>
@@ -169,59 +202,75 @@ export default function LeaderboardScreen() {
       <div className="grain-overlay" />
 
       <main className="w-full max-w-[620px] mx-auto px-[16px] pt-[40px] relative z-10 flex flex-col items-center">
+        
+        {/* HEADER AREA */}
         <div className="flex flex-col items-center w-full mb-[32px]">
+          
           <div className="flex items-center justify-center gap-[16px] md:gap-[24px] w-full mb-[16px]">
             <TrophySvg />
+            
+            {/* Bubble Graffiti Title */}
             <div className="relative">
-              <svg viewBox="0 0 400 60" width="100%" height="60" className="overflow-visible">
+              <svg viewBox="0 0 400 60" width="100%" height="60" className="overflow-visible graffiti-title-lg">
                 <defs>
                   <linearGradient id="titleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                     <stop offset="0%" stopColor="#ffcc00" />
                     <stop offset="100%" stopColor="#ff8800" />
                   </linearGradient>
                 </defs>
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
-                      fontFamily="'Press Start 2P', monospace" fontSize="36"
+                {/* Depth Face */}
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" 
+                      fontFamily="'Press Start 2P', monospace" fontSize="36" 
                       fill={C.goldShadow} stroke={C.black} strokeWidth="6" strokeLinejoin="round"
                       transform="translate(4, 5)">
                   CLOUT BOARD
                 </text>
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
-                      fontFamily="'Press Start 2P', monospace" fontSize="36"
+                {/* Main Face */}
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" 
+                      fontFamily="'Press Start 2P', monospace" fontSize="36" 
                       fill="url(#titleGrad)" stroke={C.black} strokeWidth="6" strokeLinejoin="round">
                   CLOUT BOARD
                 </text>
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
-                      fontFamily="'Press Start 2P', monospace" fontSize="36"
+                {/* Highlight/Inner fill overlay (prevents stroke overlap on fill) */}
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" 
+                      fontFamily="'Press Start 2P', monospace" fontSize="36" 
                       fill="url(#titleGrad)">
                   CLOUT BOARD
                 </text>
               </svg>
             </div>
+            
             <TrophySvg />
           </div>
+
           <h2 className="text-[#111] text-[8px] tracking-[1px] m-0 text-center bg-[#fff8e7] border-2 border-[#111] px-[16px] py-[8px] shadow-[3px_3px_0_#111]">
             TOP PRODUCERS WORLDWIDE
           </h2>
         </div>
 
+        {/* LEADERBOARD TABLE */}
         <div className="w-full bw-table-container flex flex-col mb-[32px]">
+          
+          {/* Column Headers */}
           <div className="bg-[#111] text-[#ffee00] flex px-[14px] py-[10px] text-[7px] tracking-[1px]">
             <div className="w-[64px] flex-shrink-0 text-center">RANK</div>
             <div className="flex-1">PRODUCER</div>
             <div className="w-[80px] text-center">CITIES</div>
             <div className="w-[120px] text-right">CLOUT</div>
           </div>
+
+          {/* Player Rows */}
           <div className="flex flex-col">
-            {allEntries.map((player, index) => {
+            {LEADERBOARD_DATA.map((player, index) => {
               const isEven = index % 2 === 0;
               const bgClass = isEven ? 'bg-[#fff8e7]' : 'bg-[#fff0d0]';
               const rowClass = `bw-row flex px-[14px] py-[12px] items-center ${bgClass} ${player.isCurrent ? 'current-player' : ''}`;
-
+              
+              // Rank Cell Logic
               let rankDisplay;
               if (player.rank === 1) {
                 rankDisplay = (
-                  <div className="flex items-center justify-center gap-[4px] glow-yellow-box bg-[#111] px-[4px] py-[2px]">
+                  <div className="flex items-center justify-center gap-[4px] glow-yellow-box bg-[#111] px-[4px] py-[2px] rounded-sm">
                     <CrownSvg color={C.yellow} />
                     <span className="text-[#ffee00] text-[8px]">01</span>
                   </div>
@@ -241,16 +290,23 @@ export default function LeaderboardScreen() {
                   </div>
                 );
               } else {
-                rankDisplay = <span className="text-[#888] text-[8px]">{player.rank.toString().padStart(2, '0')}</span>;
+                rankDisplay = <span className="text-[#888] text-[8px]">{(player.rank).toString().padStart(2, '0')}</span>;
               }
 
+              // Clout Cell Logic
               const isTop3 = player.rank <= 3;
               const cloutColor = isTop3 ? C.yellow : C.black;
               const cloutClass = isTop3 ? 'glow-yellow' : '';
 
               return (
                 <div key={player.rank} className={rowClass}>
-                  <div className="w-[64px] flex-shrink-0 flex justify-center">{rankDisplay}</div>
+                  
+                  {/* RANK */}
+                  <div className="w-[64px] flex-shrink-0 flex justify-center">
+                    {rankDisplay}
+                  </div>
+
+                  {/* PRODUCER */}
                   <div className="flex-1 flex items-center gap-[12px]">
                     <div className="w-[24px] h-[48px] flex-shrink-0 flex items-center justify-center">
                       <MiniSpriteSvg topColor={player.avatarTop} />
@@ -266,26 +322,30 @@ export default function LeaderboardScreen() {
                       )}
                     </div>
                   </div>
+
+                  {/* CITIES */}
                   <div className="w-[80px] flex justify-center items-center">
                     <CityIconSvg />
                     <span className="text-[#0050cc] text-[8px]">{player.cities}</span>
                   </div>
+
+                  {/* CLOUT */}
                   <div className={`w-[120px] text-right flex items-center justify-end gap-[4px] text-[9px] ${cloutClass}`} style={{ color: cloutColor }}>
                     {isTop3 && <span>★</span>}
                     {formatClout(player.clout)}
                   </div>
+
                 </div>
               );
             })}
           </div>
         </div>
 
-        <button
-          onClick={() => setLocation('/map')}
-          className="bw-btn bg-[#0050cc] text-white px-[24px] py-[16px] text-[8px] outline-none hover:text-[#ff3399]"
-        >
+        {/* BACK BUTTON */}
+        <button className="bw-btn bg-[#0050cc] text-white px-[24px] py-[16px] text-[8px] outline-none hover:text-[#ff3399]">
           ← BACK TO MAP
         </button>
+
       </main>
     </div>
   );

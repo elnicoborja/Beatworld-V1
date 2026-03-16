@@ -18,7 +18,7 @@ export interface GameState {
 interface GameContextType {
   state: GameState;
   updateState: (updates: Partial<GameState>) => void;
-  unlockCity: (cityId: string) => void;
+  unlockCity: (cityId: string, cloutReward?: number) => void;
   saveTrack: (cityId: string, track: boolean[][]) => void;
   syncToServer: () => void;
 }
@@ -61,13 +61,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, ...updates }));
   };
 
-  const unlockCity = (cityId: string) => {
+  const unlockCity = (cityId: string, cloutReward = 100) => {
     setState((prev) => {
       if (prev.completedCities.includes(cityId)) return prev;
       return {
         ...prev,
         completedCities: [...prev.completedCities, cityId],
-        clout: prev.clout + 100, // Bonus clout for finishing
+        clout: prev.clout + cloutReward,
       };
     });
   };

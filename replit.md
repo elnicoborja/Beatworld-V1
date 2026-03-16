@@ -77,11 +77,12 @@ lib/
 
 ## Visual Design
 - **Font**: Press Start 2P (Google Fonts)
-- **Background**: Dark navy (#0a0a1a)
-- **Primary**: Neon Magenta
-- **Secondary**: Neon Cyan
-- **Accent**: Neon Yellow
-- **Levels**: Each level has a distinct neon color on the world map
+- **Two coexisting styles**:
+  - **StartScreen/PerformanceScreen**: Dark nighttime neon (#0a0a1a bg, magenta/cyan/yellow neons)
+  - **WorldMap/CharacterCreator**: Bright eboy daytime (sky blue #87ceeb, cream #fff8e7, hot pink #ff3399, cobalt #0050cc)
+  - **StudioScreen**: Dark hardware UI (deep navy #1a1a2e, cobalt #003399, amber #ffaa00, gold #ddaa00) with isometric wood floor bg, mixer channels with vertical faders, REV/DIS effect toggles, hardware-style step sequencer
+  - **ReviewScreen**: Newspaper critic (cream #fff8e7, black #111 masthead, animated star rating, typewriter text, coin/particle clout award)
+  - **LeaderboardScreen**: Trophy table (yellow #ffee00 bg, bubble graffiti title, trophy SVGs, ranked player table with crown/medal icons)
 - **Aesthetic**: eboy.com isometric pixel art influence
 
 ## Audio System

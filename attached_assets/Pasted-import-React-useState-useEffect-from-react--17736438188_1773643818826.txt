@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation, useParams } from 'wouter';
-import { useGameState } from '@/hooks/use-game-state';
-import { CITIES } from '@/lib/game-data';
-import { audio } from '@/lib/audio';
+import React, { useState, useEffect } from 'react';
 
+// ============================================================================
+// COLOR PALETTE & CONSTANTS
+// ============================================================================
 const C = {
   bgDeep: '#1a1a2e',
   cobalt: '#003399',
@@ -33,6 +32,16 @@ const C = {
   wood2: '#7a5c10',
 };
 
+const CHANNELS = [
+  { id: 1, name: '909 BD' },
+  { id: 2, name: 'HARD SNR' },
+  { id: 3, name: 'JUNGLE BD' },
+  { id: 4, name: 'BLIP BD' },
+  { id: 5, name: 'RIMSHOT' },
+  { id: 6, name: '606 SNR' },
+];
+
+// SVG Isometric Tile Helper
 const IsoFloor = () => {
   const tiles = [];
   for (let row = 0; row < 20; row++) {
@@ -55,89 +64,42 @@ const IsoFloor = () => {
 };
 
 export default function StudioScreen() {
-  const { cityId } = useParams();
-  const [, setLocation] = useLocation();
-  const { state, saveTrack } = useGameState();
-  const city = cityId ? CITIES[cityId] : null;
-
-  const channelCount = Math.min(city?.numInstruments || 4, 6);
-  const channels = city ? city.instruments.slice(0, channelCount) : [];
-
-  const [tracks, setTracks] = useState<boolean[][]>(() => {
-    if (cityId && state.tracks[cityId]) return state.tracks[cityId];
-    return Array(city?.numInstruments || 4).fill(null).map(() => Array(16).fill(false));
-  });
-  const tracksRef = useRef(tracks);
-  useEffect(() => { tracksRef.current = tracks; }, [tracks]);
-
   const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(city?.defaultBpm || 120);
-  const [currentStep, setCurrentStep] = useState(-1);
+  const [bpm, setBpm] = useState(133);
+  const [currentStep, setCurrentStep] = useState(0);
   const [audioReady, setAudioReady] = useState(false);
-  const intervalRef = useRef<number | null>(null);
-  const stepRef = useRef(0);
 
-  const [volumes, setVolumes] = useState<number[]>(Array(channelCount).fill(80));
-  const [revToggles, setRevToggles] = useState<boolean[]>(Array(channelCount).fill(false));
-  const [disToggles, setDisToggles] = useState<boolean[]>(Array(channelCount).fill(false));
+  // Sequencer State (6 Tracks x 16 Steps)
+  const [grid, setGrid] = useState<boolean[][]>(
+    Array(6).fill(null).map((_, i) => 
+      Array(16).fill(false).map((_, j) => (i === 0 && j % 4 === 0) || (i === 1 && (j + 2) % 4 === 0))
+    )
+  );
 
-  const ensureAudio = useCallback(async () => {
-    await audio.init();
-    setAudioReady(audio.isReady());
-  }, []);
-
-  const playStep = useCallback((step: number) => {
-    if (!city) return;
-    const time = audio.getCurrentTime();
-    city.instruments.forEach((inst, idx) => {
-      if (tracksRef.current[idx]?.[step]) {
-        if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) {
-          audio.playDrum(inst.type, time);
-        } else {
-          audio.playSynth(inst.type as any, step, time);
-        }
-      }
-    });
-  }, [city]);
+  // Mixer State
+  const [volumes, setVolumes] = useState<number[]>(Array(6).fill(80));
+  const [revToggles, setRevToggles] = useState<boolean[]>(Array(6).fill(false));
+  const [disToggles, setDisToggles] = useState<boolean[]>(Array(6).fill(false));
 
   useEffect(() => {
+    let interval: NodeJS.Timeout;
     if (isPlaying) {
-      stepRef.current = 0;
-      const stepTime = Math.round((60_000 / bpm) / 4);
-      intervalRef.current = window.setInterval(() => {
-        const s = stepRef.current;
-        setCurrentStep(s);
-        playStep(s);
-        stepRef.current = (s + 1) % 16;
-      }, stepTime);
+      const msPerBeat = 60000 / bpm;
+      const msPerStep = msPerBeat / 4; 
+      interval = setInterval(() => {
+        setCurrentStep((prev) => (prev + 1) % 16);
+      }, msPerStep);
     } else {
-      if (intervalRef.current !== null) clearInterval(intervalRef.current);
-      intervalRef.current = null;
-      setCurrentStep(-1);
+      setCurrentStep(0);
     }
-    return () => { if (intervalRef.current !== null) clearInterval(intervalRef.current); };
-  }, [isPlaying, bpm, playStep]);
+    return () => clearInterval(interval);
+  }, [isPlaying, bpm]);
 
-  const handlePlayToggle = async () => { await ensureAudio(); setIsPlaying(p => !p); };
-
-  const toggleStep = async (trackIdx: number, stepIdx: number) => {
-    await ensureAudio();
-    const newTracks = tracks.map((row, i) =>
-      i === trackIdx ? row.map((v, j) => (j === stepIdx ? !v : v)) : row
-    );
-    setTracks(newTracks);
-    if (!newTracks[trackIdx][stepIdx]) return;
-    const inst = city?.instruments[trackIdx];
-    if (!inst) return;
-    const t = audio.getCurrentTime();
-    if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) audio.playDrum(inst.type, t);
-    else audio.playSynth(inst.type as any, stepIdx, t);
-  };
-
-  const handleFinish = () => {
-    if (!cityId) return;
-    saveTrack(cityId, tracks);
-    setLocation(`/performance/${cityId}`);
+  const toggleStep = (tIdx: number, sIdx: number) => {
+    if (!audioReady) setAudioReady(true);
+    const newGrid = [...grid];
+    newGrid[tIdx][sIdx] = !newGrid[tIdx][sIdx];
+    setGrid(newGrid);
   };
 
   const toggleEffect = (type: 'REV' | 'DIS', cIdx: number) => {
@@ -152,70 +114,115 @@ export default function StudioScreen() {
     }
   };
 
-  if (!city) return <div className="text-white p-8">City not found</div>;
-
   return (
-    <div
+    <div 
       className="relative w-screen h-screen overflow-hidden select-none uppercase font-press-start flex flex-col"
       style={{ backgroundColor: C.bgDeep, color: C.white }}
-      onClick={() => { if (!audioReady) ensureAudio(); }}
+      onClick={() => { if (!audioReady) setAudioReady(true); }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         .font-press-start { font-family: 'Press Start 2P', monospace; }
 
+        /* TEXTURES & OVERLAYS */
         .grain-overlay {
-          position: absolute; inset: 0; pointer-events: none; z-index: 50; opacity: 0.08;
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 50;
+          opacity: 0.08;
           mix-blend-mode: screen;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
-        .chamfer-top { clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% 100%, 0 100%, 0 2px); }
-        .step-cutout { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
+        /* HARDWARE UI CHROME */
+        .chamfer-top {
+          clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% 100%, 0 100%, 0 2px);
+        }
+        .step-cutout {
+          clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+        }
 
         .iso-bevel {
-          box-shadow: inset 2px 2px 0 rgba(255,255,255,0.3), inset -2px -2px 0 rgba(0,0,0,0.4), 2px 2px 0 ${C.black};
+          box-shadow: 
+            inset 2px 2px 0 rgba(255,255,255,0.3), 
+            inset -2px -2px 0 rgba(0,0,0,0.4),
+            2px 2px 0 ${C.black};
         }
         .iso-bevel:active {
-          box-shadow: inset 2px 2px 0 rgba(0,0,0,0.4), inset -2px -2px 0 rgba(255,255,255,0.2), 0px 0px 0 ${C.black};
+          box-shadow: 
+            inset 2px 2px 0 rgba(0,0,0,0.4), 
+            inset -2px -2px 0 rgba(255,255,255,0.2),
+            0px 0px 0 ${C.black};
           transform: translate(2px, 2px);
         }
 
-        .led-text { color: ${C.amber}; text-shadow: 0 0 8px ${C.amber}; font-variant-numeric: tabular-nums; }
+        /* LED TYPOGRAPHY */
+        .led-text {
+          color: ${C.amber};
+          text-shadow: 0 0 8px ${C.amber};
+          font-variant-numeric: tabular-nums;
+        }
 
+        /* CUSTOM SLIDERS */
         input[type=range].bpm-slider {
-          -webkit-appearance: none; background: ${C.grayDark}; height: 6px;
-          border: 1px solid ${C.black}; box-shadow: inset 1px 1px 0 rgba(0,0,0,0.5); width: 120px;
+          -webkit-appearance: none;
+          background: ${C.grayDark};
+          height: 6px;
+          border: 1px solid ${C.black};
+          box-shadow: inset 1px 1px 0 rgba(0,0,0,0.5);
+          width: 120px;
         }
         input[type=range].bpm-slider::-webkit-slider-thumb {
-          -webkit-appearance: none; width: 12px; height: 16px; background: ${C.gold};
+          -webkit-appearance: none;
+          width: 12px;
+          height: 16px;
+          background: ${C.gold};
           border: 1px solid ${C.black};
           box-shadow: inset 1px 1px 0 ${C.goldLight}, inset -1px -1px 0 ${C.goldDark}, 2px 2px 0 ${C.black};
           cursor: pointer;
         }
 
         input[type=range].fader-slider {
-          -webkit-appearance: none; background: ${C.black}; height: 4px; width: 80px;
-          transform: rotate(-90deg); transform-origin: center; margin: 40px 0;
+          -webkit-appearance: none;
+          background: ${C.black};
+          height: 4px;
+          width: 80px;
+          transform: rotate(-90deg);
+          transform-origin: center;
+          margin: 40px 0;
         }
         input[type=range].fader-slider::-webkit-slider-thumb {
-          -webkit-appearance: none; width: 16px; height: 24px; background: ${C.grayMid};
+          -webkit-appearance: none;
+          width: 16px;
+          height: 24px;
+          background: ${C.grayMid};
           border: 1px solid ${C.black};
-          box-shadow: inset 0 10px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.4), 0 2px 0 rgba(0,0,0,0.5);
-          cursor: pointer; border-radius: 0;
+          box-shadow: 
+            inset 0 10px 0 rgba(255,255,255,0.2), 
+            inset 0 -2px 0 rgba(0,0,0,0.4),
+            0 2px 0 rgba(0,0,0,0.5);
+          cursor: pointer;
+          border-radius: 0;
         }
 
+        /* SCROLLBAR */
         ::-webkit-scrollbar { height: 12px; width: 12px; }
         ::-webkit-scrollbar-track { background: ${C.bgDeep}; border-top: 2px solid ${C.black}; }
         ::-webkit-scrollbar-thumb { background: ${C.cobalt}; border: 2px solid ${C.black}; }
       `}</style>
 
+      {/* OVERLAYS */}
       <div className="grain-overlay" />
 
+      {/* BACKGROUND SVG (Isometric Studio Interior at 15% opacity) */}
       <div className="absolute inset-0 z-0 opacity-15 pointer-events-none flex items-center justify-center overflow-hidden">
         <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" style={{ imageRendering: 'pixelated' }}>
+          
           <IsoFloor />
-          <g>
+
+          {/* Acoustic Wall Panels */}
+          <g transform="translate(0, 0)">
             {[...Array(5)].map((_, i) => (
               <rect key={`panel-l-${i}`} x="20" y={20 + i * 40} width="60" height="30" fill="#222233" stroke="#111" />
             ))}
@@ -223,36 +230,50 @@ export default function StudioScreen() {
               <rect key={`panel-r-${i}`} x="320" y={20 + i * 40} width="60" height="30" fill="#222233" stroke="#111" />
             ))}
           </g>
+
+          {/* Vocal Booth Window */}
           <g transform="translate(120, 20)">
             <rect x="0" y="0" width="160" height="80" fill="#0a0a1a" stroke="#111" strokeWidth="2" />
             <rect x="5" y="5" width="150" height="70" fill="#111122" />
+            {/* Silhouette */}
             <rect x="60" y="30" width="40" height="40" fill="#000" />
             <rect x="70" y="10" width="20" height="20" fill="#000" />
             <rect x="75" y="25" width="10" height="5" fill="#000" />
           </g>
+
+          {/* Neon Signs */}
           <g transform="translate(130, 30)">
             <text x="0" y="15" fill="#ff0000" fontSize="12" fontFamily="'Press Start 2P'" style={{ textShadow: '0 0 8px #ff0000' }}>ON AIR</text>
             <text x="90" y="15" fill="#ffaa00" fontSize="12" fontFamily="'Press Start 2P'" className="animate-pulse" style={{ textShadow: '0 0 8px #ffaa00' }}>REC</text>
           </g>
+
+          {/* Mixing Board */}
           <g transform="translate(80, 150)">
             <polygon points="0,50 40,0 200,0 240,50" fill={C.cobalt} stroke="#111" strokeWidth="2" />
             <polygon points="0,50 240,50 240,60 0,60" fill={C.cobaltDark} stroke="#111" strokeWidth="2" />
+            {/* Faders */}
             {[...Array(16)].map((_, i) => (
-              <rect key={`fader-${i}`} x={30 + i * 11} y="15" width="4" height="25" fill="#555" transform="skewX(-38)" />
+              <rect key={`fader-${i}`} x={30 + i * 11} y="15" width="4" height="25" fill="#555" transform={`skewX(-38)`} />
             ))}
           </g>
+
+          {/* Studio Monitors (L & R) */}
           <g transform="translate(40, 110)">
             <polygon points="0,10 20,0 40,10 20,20" fill="#222" stroke="#111" />
             <polygon points="0,10 20,20 20,60 0,50" fill="#111" stroke="#111" />
             <polygon points="20,20 40,10 40,50 20,60" fill="#0a0a0a" stroke="#111" />
-            <circle cx="20" cy="35" r="8" fill="#333" /><circle cx="20" cy="35" r="4" fill="#111" />
+            <circle cx="20" cy="35" r="8" fill="#333" />
+            <circle cx="20" cy="35" r="4" fill="#111" />
           </g>
           <g transform="translate(320, 110)">
             <polygon points="0,10 20,0 40,10 20,20" fill="#222" stroke="#111" />
             <polygon points="0,10 20,20 20,60 0,50" fill="#111" stroke="#111" />
             <polygon points="20,20 40,10 40,50 20,60" fill="#0a0a0a" stroke="#111" />
-            <circle cx="20" cy="35" r="8" fill="#333" /><circle cx="20" cy="35" r="4" fill="#111" />
+            <circle cx="20" cy="35" r="8" fill="#333" />
+            <circle cx="20" cy="35" r="4" fill="#111" />
           </g>
+
+          {/* Rack Equipment */}
           <g transform="translate(340, 180)">
             <rect x="0" y="0" width="50" height="80" fill="#222" stroke="#111" strokeWidth="2" />
             {[...Array(6)].map((_, i) => (
@@ -267,89 +288,94 @@ export default function StudioScreen() {
         </svg>
       </div>
 
+      {/* HEADER BAR */}
       <header className="relative z-30 flex flex-col md:flex-row justify-between items-start md:items-center px-[24px] py-[16px] border-b-[3px] border-[#111]" style={{ backgroundColor: C.cobalt }}>
+        
+        {/* Left: Info & BPM */}
         <div className="flex flex-col gap-[8px] mb-4 md:mb-0">
           <div className="text-[11px] text-white drop-shadow-[2px_2px_0_#111]">
-            {city.emoji} {city.name.toUpperCase()} STUDIO
+            🌴 LOS ANGELES STUDIO
           </div>
           <div className="flex items-center gap-[12px] text-[8px] text-[#87ceeb]">
-            <span className="bg-[#002266] px-[6px] py-[4px] border border-[#111]">{city.genre.toUpperCase()}</span>
+            <span className="bg-[#002266] px-[6px] py-[4px] border border-[#111]">G-FUNK</span>
             <span className="flex items-center gap-[6px] bg-[#111] px-[8px] py-[4px] border border-[#334455]">
               BPM: <span className="led-text text-[10px]">{bpm.toString().padStart(3, '0')}</span>
             </span>
           </div>
         </div>
 
+        {/* Center: BPM Slider */}
         <div className="flex flex-col items-center gap-[6px] bg-[#002266] p-[8px] border-2 border-[#111] shadow-[inset_2px_2px_0_rgba(0,0,0,0.3)]">
           <div className="text-[#87ceeb] text-[6px] tracking-widest w-full flex justify-between">
             <span>TEMPO</span>
             <span>SHUFFLE</span>
           </div>
           <div className="flex gap-[16px]">
-            <input
-              type="range" min="60" max="200" value={bpm}
+            <input 
+              type="range" min="60" max="200" value={bpm} 
               onChange={(e) => setBpm(parseInt(e.target.value))}
               className="bpm-slider"
             />
-            <input
+            {/* Fake shuffle slider for visual accuracy to reference */}
+            <input 
               type="range" min="0" max="100" defaultValue="50"
               className="bpm-slider" style={{ width: '60px' }}
             />
           </div>
         </div>
 
+        {/* Right: Transport Controls */}
         <div className="flex gap-[12px] mt-4 md:mt-0 bg-[#002266] p-[8px] border-2 border-[#111] shadow-[inset_2px_2px_0_rgba(0,0,0,0.3)]">
-          <button
-            onClick={handlePlayToggle}
+          <button 
+            onClick={() => { if (!audioReady) setAudioReady(true); setIsPlaying(!isPlaying); }}
             className="relative px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none flex items-center gap-[6px]"
             style={{ backgroundColor: isPlaying ? C.redBright : C.green }}
           >
-            <div className="w-[6px] h-[6px] bg-white shadow-[inset_1px_1px_0_#ccc]" />
+            {/* Record dot detail */}
+            <div className="w-[6px] h-[6px] bg-white rounded-full shadow-[inset_1px_1px_0_#ccc]" />
             {isPlaying ? 'STOP ■' : 'PLAY ▶'}
           </button>
-          <button
-            onClick={handleFinish}
-            className="px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none"
-            style={{ backgroundColor: C.cobaltLight }}
-          >
+          
+          <button className="px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none" style={{ backgroundColor: C.cobaltLight }}>
             FINISH ►
-          </button>
-          <button
-            onClick={() => setLocation('/map')}
-            className="px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none"
-            style={{ backgroundColor: C.grayDark }}
-          >
-            ← MAP
           </button>
         </div>
       </header>
 
+      {/* MAIN CONTENT AREA */}
       <main className="relative z-20 flex flex-1 overflow-hidden">
+        
+        {/* Left Speaker Grille Detail */}
         <div className="hidden lg:flex w-[120px] flex-col items-center justify-center border-r-[3px] border-[#111] bg-[#111] shadow-[inset_-4px_0_12px_rgba(0,0,0,0.8)] px-[16px]">
           <div className="w-full aspect-square bg-[#222] border-[4px] border-[#333] flex items-center justify-center shadow-[4px_4px_0_#000]">
-            <div className="w-[80%] aspect-square bg-[#1a1a1a] border-[2px] border-[#0a0a0a] flex items-center justify-center">
-              <div className="w-[40%] aspect-square bg-[#111] border-[2px] border-[#222] shadow-[inset_0_4px_4px_rgba(0,0,0,0.8)]" />
+            <div className="w-[80%] aspect-square bg-[#1a1a1a] border-[2px] border-[#0a0a0a] rounded-full flex items-center justify-center">
+              <div className="w-[40%] aspect-square bg-[#111] border-[2px] border-[#222] rounded-full shadow-[inset_0_4px_4px_rgba(0,0,0,0.8)]" />
             </div>
           </div>
           <div className="w-full aspect-square bg-[#222] border-[4px] border-[#333] flex items-center justify-center shadow-[4px_4px_0_#000] mt-[24px]">
-            <div className="w-[80%] aspect-square bg-[#1a1a1a] border-[2px] border-[#0a0a0a] flex items-center justify-center">
-              <div className="w-[40%] aspect-square bg-[#111] border-[2px] border-[#222] shadow-[inset_0_4px_4px_rgba(0,0,0,0.8)]" />
+            <div className="w-[80%] aspect-square bg-[#1a1a1a] border-[2px] border-[#0a0a0a] rounded-full flex items-center justify-center">
+              <div className="w-[40%] aspect-square bg-[#111] border-[2px] border-[#222] rounded-full shadow-[inset_0_4px_4px_rgba(0,0,0,0.8)]" />
             </div>
           </div>
         </div>
 
+        {/* Sequencer & Mixer Section */}
         <div className="flex-1 flex flex-col overflow-x-auto p-[16px] md:p-[24px]">
+          
           <div className="min-w-[800px] flex flex-col gap-[8px]">
+            
+            {/* BEAT RULER */}
             <div className="flex mb-[4px]">
-              <div className="w-[100px] flex-shrink-0" />
+              <div className="w-[100px] flex-shrink-0" /> {/* Spacer for alignments if needed, but in this layout tracks are below */}
               <div className="flex-1 flex gap-[4px] bg-[#111] border-2 border-[#334455] p-[4px] shadow-[inset_2px_2px_0_rgba(0,0,0,0.5)]">
                 {[...Array(16)].map((_, i) => {
-                  let content: React.ReactNode = <span className="text-[#334455]">#</span>;
+                  let content = <span className="text-[#334455]">#</span>;
                   let color = C.white;
                   if (i === 0) { content = <>1</>; color = C.pink; }
                   else if (i === 4) { content = <>2</>; color = C.cyan; }
                   else if (i === 8) { content = <>3</>; color = C.yellow; }
                   else if (i === 12) { content = <>4</>; color = C.orange; }
+                  
                   return (
                     <div key={`ruler-${i}`} className="flex-1 flex justify-center items-center text-[8px]" style={{ color }}>
                       {content}
@@ -359,17 +385,23 @@ export default function StudioScreen() {
               </div>
             </div>
 
+            {/* STEP BUTTON ROWS (Grid of 6x16) */}
             <div className="flex flex-col gap-[8px] mb-[24px] bg-[#002266] p-[8px] border-2 border-[#111] shadow-[4px_4px_0_#111]">
-              {tracks.map((track, tIdx) => (
+              {grid.map((track, tIdx) => (
                 <div key={`track-${tIdx}`} className="flex gap-[4px]">
                   {track.map((isActive, sIdx) => {
                     const isDownbeat = sIdx % 4 === 0;
                     const isCurrent = isPlaying && currentStep === sIdx;
+                    
                     let bg = isActive ? C.gold : (isDownbeat ? C.stepInactiveDown : C.stepInactive);
-                    let shadow = isActive
+                    let shadow = isActive 
                       ? `inset 2px 2px 0 ${C.goldLight}, inset -2px -2px 0 ${C.goldDark}, inset 0 0 3px #ffdd44`
                       : `inset 2px 2px 0 ${C.stepBevelTop}, inset -2px -2px 0 ${C.stepBevelBot}`;
-                    if (isCurrent) shadow += `, 0 0 8px ${C.white}`;
+                    
+                    if (isCurrent) {
+                      shadow += `, 0 0 8px ${C.white}`;
+                    }
+
                     return (
                       <button
                         key={`step-${tIdx}-${sIdx}`}
@@ -377,6 +409,7 @@ export default function StudioScreen() {
                         className={`flex-1 aspect-square border border-[#111] step-cutout outline-none transition-none relative ${isCurrent ? 'ring-2 ring-white z-10' : ''}`}
                         style={{ backgroundColor: bg, boxShadow: shadow }}
                       >
+                        {/* Little indicator notch on active steps */}
                         {isActive && <div className="absolute top-[2px] left-[2px] w-[4px] h-[2px] bg-white opacity-60" />}
                       </button>
                     );
@@ -385,40 +418,52 @@ export default function StudioScreen() {
               ))}
             </div>
 
+            {/* MIXER CHANNEL STRIPS (Vertical columns) */}
             <div className="flex gap-[8px]">
-              {channels.map((ch, cIdx) => (
+              {CHANNELS.map((ch, cIdx) => (
                 <div key={ch.id} className="flex-1 flex flex-col border-[2px] border-[#111] shadow-[4px_4px_0_#111] bg-[#111]">
+                  
+                  {/* Channel Header */}
                   <div className="chamfer-top p-[6px] text-center border-b-[2px] border-[#111] flex flex-col items-center gap-[4px]" style={{ backgroundColor: C.cobalt }}>
                     <div className="flex items-center gap-[4px]">
-                      <div className="w-[4px] h-[4px] bg-[#ff0000] shadow-[0_0_4px_#f00]" />
-                      <span className="text-[6px] text-white">CH {cIdx + 1}</span>
+                      <div className="w-[4px] h-[4px] bg-[#ff0000] rounded-full shadow-[0_0_4px_#f00]" />
+                      <span className="text-[6px] text-white">CH {ch.id}</span>
                     </div>
+                    {/* Fake Dropdown */}
                     <div className="w-full bg-white text-[#111] text-[6px] p-[4px] border-[2px] border-[#111] flex justify-between items-center shadow-[inset_1px_1px_0_rgba(0,0,0,0.2)]">
-                      <span className="truncate">{ch.name.toUpperCase()}</span>
+                      <span className="truncate">{ch.name}</span>
                       <span>▼</span>
                     </div>
                   </div>
+
+                  {/* Effects & Fader Area */}
                   <div className="p-[8px] flex flex-col items-center gap-[12px] flex-1 bg-[#1a1a2e] relative overflow-hidden">
+                    {/* Subtle grid line background for mixer section */}
                     <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(0deg, transparent 24%, #ffffff 25%, #ffffff 26%, transparent 27%, transparent 74%, #ffffff 75%, #ffffff 76%, transparent 77%, transparent)', backgroundSize: '100% 10px' }} />
+
+                    {/* Effect Toggles (REV / DIS) */}
                     <div className="flex w-full justify-between gap-[4px] relative z-10">
-                      <button
+                      <button 
                         onClick={() => toggleEffect('REV', cIdx)}
                         className="flex-1 flex flex-col items-center gap-[2px] bg-[#002266] p-[4px] border-[2px] border-[#111] iso-bevel outline-none"
                       >
-                        <div className={`w-[4px] h-[4px] border border-[#111] ${revToggles[cIdx] ? 'bg-[#ff0000] shadow-[0_0_6px_#f00]' : 'bg-[#440000]'}`} />
+                        <div className={`w-[4px] h-[4px] rounded-full border border-[#111] ${revToggles[cIdx] ? 'bg-[#ff0000] shadow-[0_0_6px_#f00]' : 'bg-[#440000]'}`} />
                         <span className="text-[5px]">REV</span>
                       </button>
-                      <button
+                      <button 
                         onClick={() => toggleEffect('DIS', cIdx)}
                         className="flex-1 flex flex-col items-center gap-[2px] bg-[#002266] p-[4px] border-[2px] border-[#111] iso-bevel outline-none"
                       >
-                        <div className={`w-[4px] h-[4px] border border-[#111] ${disToggles[cIdx] ? 'bg-[#ff0000] shadow-[0_0_6px_#f00]' : 'bg-[#440000]'}`} />
+                        <div className={`w-[4px] h-[4px] rounded-full border border-[#111] ${disToggles[cIdx] ? 'bg-[#ff0000] shadow-[0_0_6px_#f00]' : 'bg-[#440000]'}`} />
                         <span className="text-[5px]">DIS</span>
                       </button>
                     </div>
+
+                    {/* Vertical Volume Fader */}
                     <div className="flex-1 flex items-center justify-center relative z-10 my-[20px]">
-                      <input
-                        type="range" min="0" max="100"
+                      <input 
+                        type="range" 
+                        min="0" max="100" 
                         value={volumes[cIdx]}
                         onChange={(e) => {
                           const newVols = [...volumes];
@@ -428,14 +473,17 @@ export default function StudioScreen() {
                         className="fader-slider"
                       />
                     </div>
+
                   </div>
                 </div>
               ))}
             </div>
+
           </div>
         </div>
       </main>
 
+      {/* STATUS BAR */}
       <footer className="relative z-30 bg-[#111] border-t-[3px] border-[#334455] px-[24px] py-[8px] flex justify-between items-center flex-shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.5)]">
         <div className="text-[7px]">
           {audioReady ? (
@@ -444,9 +492,7 @@ export default function StudioScreen() {
             <span className="text-[#ffee00] animate-pulse drop-shadow-[0_0_4px_#ffee00]">○ CLICK TO ENABLE AUDIO</span>
           )}
         </div>
-        <div className="text-[7px]">
-          <span className="text-[#87ceeb]">{city.emoji} {city.venue.toUpperCase()} // VOLT-909</span>
-        </div>
+        
         <div className="text-[#ff3399] text-[7px] drop-shadow-[0_0_4px_#ff3399]">
           {isPlaying ? (
             <span>► PLAYING · STEP {(currentStep + 1).toString().padStart(2, '0')}/16</span>
@@ -455,6 +501,7 @@ export default function StudioScreen() {
           )}
         </div>
       </footer>
+
     </div>
   );
 }
