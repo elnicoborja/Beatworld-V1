@@ -4,7 +4,37 @@ import { useGameState } from '@/hooks/use-game-state';
 import { CITIES } from '@/lib/game-data';
 import { audio } from '@/lib/audio';
 
-const CYCLE_COLORS = ['#ff00ff', '#00ffff', '#ffff00', '#ff8800'];
+const NEON = ['#ff00ff', '#00ffff', '#ffff00', '#ff8800'];
+const SKIN_TONES = ['#f1c27d', '#8d5524', '#c68642', '#6f4e37', '#e0ac69'];
+const TOP_COLORS = ['#ff3399', '#0050cc', '#44cc00', '#ff8800', '#6600cc', '#00aaaa', '#ffee00', '#cc3300'];
+
+function shade(col: string, amt: number) {
+  const c = col.startsWith('#') ? col.slice(1) : col;
+  const num = parseInt(c, 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + amt));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt));
+  const b = Math.min(255, Math.max(0, (num & 0xff) + amt));
+  return '#' + ((b | (g << 8) | (r << 16)) >>> 0).toString(16).padStart(6, '0');
+}
+
+function IsoNpc({ x, y, skinTone, topColor, dancing, delay }: { x: number; y: number; skinTone: string; topColor: string; dancing: boolean; delay: number }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      <g className={dancing ? 'anim-dancer' : ''} style={{ animationDelay: `${delay}s` }}>
+        <rect x="-4" y="-12" width="8" height="6" fill={skinTone} />
+        <rect x="-2" y="-14" width="4" height="2" fill="#111" />
+        <rect x="-2" y="-10" width="2" height="1" fill="#111" />
+        <rect x="1" y="-10" width="2" height="1" fill="#111" />
+        <rect x="-5" y="-6" width="10" height="8" fill={topColor} />
+        <rect x="-7" y="-4" width="3" height="6" fill={topColor} />
+        <rect x="5" y="-4" width="3" height="6" fill={topColor} />
+        <rect x="-5" y="2" width="10" height="6" fill="#334455" />
+        <rect x="-5" y="8" width="4" height="3" fill="#111" />
+        <rect x="1" y="8" width="4" height="3" fill="#111" />
+      </g>
+    </g>
+  );
+}
 
 export default function PerformanceScreen() {
   const { cityId } = useParams();
@@ -55,17 +85,21 @@ export default function PerformanceScreen() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  const crowd = useMemo(() => {
-    const items: { id: string; x: number; y: number; delay: number; color: string }[] = [];
-    for (let r = 0; r < 4; r++) {
-      const rowY = 160 + r * 15;
-      for (let c = 0; c < 35; c++) {
+  const npcs = useMemo(() => {
+    const items: { id: string; x: number; y: number; skinTone: string; topColor: string; delay: number }[] = [];
+    for (let row = 0; row < 5; row++) {
+      const rowCount = 8 + row * 3;
+      const rowY = 200 + row * 30;
+      for (let c = 0; c < rowCount; c++) {
+        const isoX = (c - row * 0.5) * 20 - rowCount * 10 + 200;
+        const isoY = rowY + c * 2;
         items.push({
-          id: `h-${r}-${c}`,
-          x: c * 14 - 20 + (r % 2) * 6,
-          y: rowY,
+          id: `npc-${row}-${c}`,
+          x: isoX,
+          y: isoY,
+          skinTone: SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)],
+          topColor: TOP_COLORS[Math.floor(Math.random() * TOP_COLORS.length)],
           delay: Math.random() * 0.5,
-          color: CYCLE_COLORS[Math.floor(Math.random() * CYCLE_COLORS.length)],
         });
       }
     }
@@ -75,7 +109,7 @@ export default function PerformanceScreen() {
   const confetti = useMemo(() =>
     Array(40).fill(0).map((_, i) => ({
       id: i,
-      color: CYCLE_COLORS[Math.floor(Math.random() * CYCLE_COLORS.length)],
+      color: NEON[Math.floor(Math.random() * NEON.length)],
       tx: (Math.random() - 0.5) * 400,
       ty: (Math.random() - 1) * 300 - 50,
       delay: Math.random() * 0.2,
@@ -89,9 +123,9 @@ export default function PerformanceScreen() {
       style={{ fontFamily: "'Press Start 2P', monospace" }}
     >
       <style>{`
-        @keyframes crowdBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
-        .anim-crowd { animation: crowdBob 0.4s infinite steps(2); }
-        @keyframes lightBeamFlash { 0%,100%{opacity:0.6} 50%{opacity:0.1} }
+        @keyframes dancerBob { 0%,100%{transform:translateY(0) scaleX(1)} 25%{transform:translateY(-3px) scaleX(0.95)} 50%{transform:translateY(0) scaleX(1)} 75%{transform:translateY(-2px) scaleX(1.05)} }
+        .anim-dancer { animation: dancerBob 0.5s infinite steps(4); }
+        @keyframes lightBeamFlash { 0%,100%{opacity:0.5} 50%{opacity:0.08} }
         .anim-beam-1 { animation: lightBeamFlash 0.3s infinite steps(2); }
         .anim-beam-2 { animation: lightBeamFlash 0.3s infinite steps(2) 0.1s; }
         .anim-beam-3 { animation: lightBeamFlash 0.3s infinite steps(2) 0.2s; }
@@ -109,45 +143,70 @@ export default function PerformanceScreen() {
         .anim-confetti { animation: confettiFly 1.5s ease-out forwards; }
         .light-beam { clip-path: polygon(calc(50% - 30px) 0, calc(50% + 30px) 0, calc(50% + 100px) 100%, calc(50% - 100px) 100%); }
         .scanlines-pf { background: repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0px,rgba(0,0,0,0) 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px); pointer-events:none; }
-        .grid-pf { background-image:linear-gradient(rgba(255,0,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,0,255,0.03) 1px,transparent 1px); background-size:32px 32px; pointer-events:none; }
       `}</style>
 
-      {/* Background SVG venue */}
-      <div className="absolute inset-0 z-0 bg-[#0d0d22] flex items-end justify-center">
-        <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax slice" style={{ imageRendering: 'pixelated' }}>
-          <rect x="150" y="40" width="100" height="40" fill="#111133" />
-          <rect x="160" y="50" width="80" height="20" fill="#0a0a1a" />
-          <rect x="0" y="20" width="400" height="10" fill="#0a0a1a" stroke="#444466" strokeWidth="2" />
-          <polygon points="40,30 60,30 50,50" fill="#ff00ff" />
-          <polygon points="140,30 160,30 150,50" fill="#00ffff" />
-          <polygon points="240,30 260,30 250,50" fill="#ffff00" />
-          <polygon points="340,30 360,30 350,50" fill="#ff8800" />
-          {crowd.map(person => (
-            <g key={person.id} className={isPlaying ? 'anim-crowd' : ''} style={{ animationDelay: `${person.delay}s` }}>
-              <rect x={person.x} y={person.y} width="12" height="8" fill={person.color} opacity="0.8" />
-              <rect x={person.x + 2} y={person.y - 2} width="8" height="4" fill="#0a0a1a" />
-            </g>
+      <div className="absolute inset-0 z-0 flex items-end justify-center overflow-hidden">
+        <svg width="100%" height="100%" viewBox="0 0 400 380" preserveAspectRatio="xMidYMid slice" style={{ imageRendering: 'pixelated' }}>
+          <rect x="0" y="0" width="400" height="380" fill="#0d0d22" />
+
+          <g>
+            {[...Array(12)].map((_, row) => (
+              [...Array(20)].map((_, col) => {
+                const tileX = (col - row) * 20 + 200;
+                const tileY = (col + row) * 10 + 120;
+                const fill = (row + col) % 2 === 0 ? '#1a1a33' : '#151530';
+                return (
+                  <polygon
+                    key={`stage-${row}-${col}`}
+                    points={`${tileX},${tileY} ${tileX + 20},${tileY + 10} ${tileX},${tileY + 20} ${tileX - 20},${tileY + 10}`}
+                    fill={fill}
+                    stroke="#222244"
+                    strokeWidth="0.5"
+                  />
+                );
+              })
+            ))}
+          </g>
+
+          <polygon points="120,130 200,90 280,130 200,170" fill="#222244" stroke="#333366" strokeWidth="1" />
+          <polygon points="120,130 200,170 200,185 120,145" fill="#1a1a33" stroke="#333366" strokeWidth="0.5" />
+          <polygon points="200,170 280,130 280,145 200,185" fill="#111128" stroke="#333366" strokeWidth="0.5" />
+
+          <rect x="175" y="100" width="50" height="30" fill="#111133" stroke="#333366" strokeWidth="1" />
+          <rect x="180" y="105" width="15" height="8" fill="#222244" />
+          <rect x="180" y="105" width="15" height="8" fill="#222244" />
+          {[...Array(4)].map((_, i) => (
+            <rect key={`knob-${i}`} x={200 + i * 6} y={108} width="3" height="3" fill="#444466" />
           ))}
-          <g transform="translate(10,140)">
-            <rect x="0" y="0" width="40" height="80" fill="#0a0a1a" stroke="#444466" strokeWidth="2" />
-            <circle cx="20" cy="20" r="12" fill="#111133" /><circle cx="20" cy="60" r="12" fill="#111133" />
-          </g>
-          <g transform="translate(350,140)">
-            <rect x="0" y="0" width="40" height="80" fill="#0a0a1a" stroke="#444466" strokeWidth="2" />
-            <circle cx="20" cy="20" r="12" fill="#111133" /><circle cx="20" cy="60" r="12" fill="#111133" />
-          </g>
+          <rect x="180" y="118" width="40" height="6" fill="#0a0a1a" />
+
+          <rect x="10" y="60" width="30" height="60" fill="#0a0a1a" stroke="#333366" />
+          <circle cx="25" cy="75" r="10" fill="#111133" />
+          <circle cx="25" cy="105" r="10" fill="#111133" />
+
+          <rect x="360" y="60" width="30" height="60" fill="#0a0a1a" stroke="#333366" />
+          <circle cx="375" cy="75" r="10" fill="#111133" />
+          <circle cx="375" cy="105" r="10" fill="#111133" />
+
+          <polygon points="40,30 60,30 50,50" fill={NEON[0]} opacity="0.6" />
+          <polygon points="140,30 160,30 150,50" fill={NEON[1]} opacity="0.6" />
+          <polygon points="240,30 260,30 250,50" fill={NEON[2]} opacity="0.6" />
+          <polygon points="340,30 360,30 350,50" fill={NEON[3]} opacity="0.6" />
+
+          {npcs.map(npc => (
+            <IsoNpc
+              key={npc.id}
+              x={npc.x}
+              y={npc.y}
+              skinTone={npc.skinTone}
+              topColor={npc.topColor}
+              dancing={isPlaying}
+              delay={npc.delay}
+            />
+          ))}
         </svg>
       </div>
 
-      {/* Stage floor */}
-      <div className={`absolute bottom-0 w-full h-[30%] bg-[#0a0a1a] border-t-2 z-10 flex flex-col ${isPlaying ? 'anim-stage-glow' : 'border-[#444466]'}`}>
-        <div className="w-full h-1 bg-[#111133] mt-2 opacity-50" />
-        <div className="w-full h-1 bg-[#111133] mt-4 opacity-40" />
-        <div className="w-full h-1 bg-[#111133] mt-6 opacity-30" />
-        <div className="w-full h-1 bg-[#111133] mt-8 opacity-20" />
-      </div>
-
-      {/* Light beams */}
       {isPlaying && (
         <div className="absolute top-[30px] left-0 w-full h-[40vh] z-10 flex justify-between px-[5%] pointer-events-none mix-blend-screen">
           <div className="w-[100px] h-full bg-[#ff00ff] light-beam anim-beam-1 origin-top rotate-[15deg]" />
@@ -157,11 +216,8 @@ export default function PerformanceScreen() {
         </div>
       )}
 
-      {/* Overlays */}
-      <div className="absolute inset-0 z-20 grid-pf" />
-      <div className="absolute inset-0 z-30 scanlines-pf" />
+      <div className="absolute inset-0 z-20 scanlines-pf" />
 
-      {/* Center HUD */}
       <div className="relative z-40 flex flex-col items-center gap-6">
         <div className="bg-[#111133]/90 border-2 border-[#ff00ff] p-4 flex flex-col items-center gap-2 backdrop-blur-sm" style={{ boxShadow: '3px 3px 0px #000' }}>
           <h1 className="text-[#ff00ff] text-[11px] text-center" style={{ textShadow: '0 0 8px #ff00ff' }}>
@@ -172,7 +228,6 @@ export default function PerformanceScreen() {
           </p>
         </div>
 
-        {/* VU Meter */}
         <div className="bg-[#111133] border border-[#444466] p-2 flex gap-1 items-end h-[60px]" style={{ boxShadow: '3px 3px 0px #000' }}>
           {vuLevels.map((level, i) => {
             const h = { 1: '25%', 2: '50%', 3: '75%', 4: '100%' }[level] || '25%';
@@ -190,7 +245,6 @@ export default function PerformanceScreen() {
         </div>
       </div>
 
-      {/* Performance Complete Overlay */}
       {!isPlaying && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a1a]/80 backdrop-blur-sm">
           <h2
@@ -208,7 +262,6 @@ export default function PerformanceScreen() {
             SEE REVIEWS
           </button>
 
-          {/* Confetti */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
             {confetti.map(c => (
               <div

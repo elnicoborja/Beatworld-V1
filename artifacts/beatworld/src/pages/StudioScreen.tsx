@@ -5,7 +5,8 @@ import { CITIES } from '@/lib/game-data';
 import { audio } from '@/lib/audio';
 
 const C = {
-  bgDeep: '#1a1a2e',
+  bgDeep: '#0a0a1e',
+  panelBg: '#121228',
   cobalt: '#003399',
   cobaltDark: '#002266',
   cobaltLight: '#3366cc',
@@ -13,10 +14,10 @@ const C = {
   gold: '#ddaa00',
   goldLight: '#ffdd44',
   goldDark: '#aa7700',
-  stepInactive: '#1a3a6a',
-  stepInactiveDown: '#1e3d70',
-  stepBevelTop: '#2a5a9a',
-  stepBevelBot: '#0a1a3a',
+  stepOff: '#1a2a4a',
+  stepOffBeat: '#1e3050',
+  stepOn: '#0066ff',
+  stepOnBright: '#3399ff',
   pink: '#ff3399',
   cyan: '#00ffff',
   yellow: '#ffee00',
@@ -24,34 +25,14 @@ const C = {
   red: '#cc3300',
   redBright: '#ff0000',
   green: '#44cc00',
-  greenDark: '#226600',
   black: '#111111',
   grayDark: '#334455',
   grayMid: '#888899',
   white: '#ffffff',
-  wood1: '#8B6914',
-  wood2: '#7a5c10',
-};
-
-const IsoFloor = () => {
-  const tiles = [];
-  for (let row = 0; row < 20; row++) {
-    for (let col = 0; col < 20; col++) {
-      const x = (col - row) * 20 + 200;
-      const y = (col + row) * 10 + 50;
-      const fill = (row + col) % 2 === 0 ? C.wood1 : C.wood2;
-      tiles.push(
-        <polygon
-          key={`tile-${row}-${col}`}
-          points={`${x},${y} ${x + 20},${y + 10} ${x},${y + 20} ${x - 20},${y + 10}`}
-          fill={fill}
-          stroke={C.bgDeep}
-          strokeWidth="1"
-        />
-      );
-    }
-  }
-  return <g>{tiles}</g>;
+  muteBg: '#442200',
+  muteActive: '#ff8800',
+  soloBg: '#002244',
+  soloActive: '#00ccff',
 };
 
 export default function StudioScreen() {
@@ -60,12 +41,12 @@ export default function StudioScreen() {
   const { state, saveTrack } = useGameState();
   const city = cityId ? CITIES[cityId] : null;
 
-  const channelCount = Math.min(city?.numInstruments || 4, 6);
+  const channelCount = city?.numInstruments || 4;
   const channels = city ? city.instruments.slice(0, channelCount) : [];
 
   const [tracks, setTracks] = useState<boolean[][]>(() => {
     if (cityId && state.tracks[cityId]) return state.tracks[cityId];
-    return Array(city?.numInstruments || 4).fill(null).map(() => Array(16).fill(false));
+    return Array(channelCount).fill(null).map(() => Array(16).fill(false));
   });
   const tracksRef = useRef(tracks);
   useEffect(() => { tracksRef.current = tracks; }, [tracks]);
@@ -78,8 +59,21 @@ export default function StudioScreen() {
   const stepRef = useRef(0);
 
   const [volumes, setVolumes] = useState<number[]>(Array(channelCount).fill(80));
-  const [revToggles, setRevToggles] = useState<boolean[]>(Array(channelCount).fill(false));
-  const [disToggles, setDisToggles] = useState<boolean[]>(Array(channelCount).fill(false));
+  const [mutes, setMutes] = useState<boolean[]>(Array(channelCount).fill(false));
+  const [solos, setSolos] = useState<boolean[]>(Array(channelCount).fill(false));
+  const [filterValues, setFilterValues] = useState<number[]>(Array(channelCount).fill(100));
+
+  const volumesRef = useRef(volumes);
+  const mutesRef = useRef(mutes);
+  const solosRef = useRef(solos);
+  const filterRef = useRef(filterValues);
+  useEffect(() => { volumesRef.current = volumes; }, [volumes]);
+  useEffect(() => { mutesRef.current = mutes; }, [mutes]);
+  useEffect(() => { solosRef.current = solos; }, [solos]);
+  useEffect(() => { filterRef.current = filterValues; }, [filterValues]);
+
+  const [showProducer, setShowProducer] = useState(true);
+  const [selectedTrack, setSelectedTrack] = useState(0);
 
   const ensureAudio = useCallback(async () => {
     await audio.init();
@@ -89,16 +83,22 @@ export default function StudioScreen() {
   const playStep = useCallback((step: number) => {
     if (!city) return;
     const time = audio.getCurrentTime();
+    const hasSolo = solosRef.current.some(s => s);
     city.instruments.forEach((inst, idx) => {
-      if (tracksRef.current[idx]?.[step]) {
-        if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) {
-          audio.playDrum(inst.type, time);
-        } else {
-          audio.playSynth(inst.type as any, step, time);
-        }
+      if (idx >= channelCount) return;
+      if (mutesRef.current[idx]) return;
+      if (hasSolo && !solosRef.current[idx]) return;
+      if (!tracksRef.current[idx]?.[step]) return;
+      const vol = volumesRef.current[idx] / 100;
+      const fVal = filterRef.current[idx];
+      const filterFreq = fVal < 100 ? 200 + (fVal / 100) * 19800 : undefined;
+      if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) {
+        audio.playDrum(inst.type, time, vol, filterFreq);
+      } else {
+        audio.playSynth(inst.type as any, step, time, vol, filterFreq);
       }
     });
-  }, [city]);
+  }, [city, channelCount]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -129,9 +129,10 @@ export default function StudioScreen() {
     if (!newTracks[trackIdx][stepIdx]) return;
     const inst = city?.instruments[trackIdx];
     if (!inst) return;
+    const vol = volumes[trackIdx] / 100;
     const t = audio.getCurrentTime();
-    if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) audio.playDrum(inst.type, t);
-    else audio.playSynth(inst.type as any, stepIdx, t);
+    if (['kick', 'snare', 'hihat', 'perc'].includes(inst.type)) audio.playDrum(inst.type, t, vol);
+    else audio.playSynth(inst.type as any, stepIdx, t, vol);
   };
 
   const handleFinish = () => {
@@ -140,19 +141,22 @@ export default function StudioScreen() {
     setLocation(`/performance/${cityId}`);
   };
 
-  const toggleEffect = (type: 'REV' | 'DIS', cIdx: number) => {
-    if (type === 'REV') {
-      const newRev = [...revToggles];
-      newRev[cIdx] = !newRev[cIdx];
-      setRevToggles(newRev);
-    } else {
-      const newDis = [...disToggles];
-      newDis[cIdx] = !newDis[cIdx];
-      setDisToggles(newDis);
-    }
+  const toggleMute = (idx: number) => {
+    const m = [...mutes];
+    m[idx] = !m[idx];
+    setMutes(m);
+  };
+
+  const toggleSolo = (idx: number) => {
+    const s = [...solos];
+    s[idx] = !s[idx];
+    setSolos(s);
   };
 
   if (!city) return <div className="text-white p-8">City not found</div>;
+
+  const producer = city.guestProducer;
+  const hasSolo = solos.some(s => s);
 
   return (
     <div
@@ -163,295 +167,225 @@ export default function StudioScreen() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         .font-press-start { font-family: 'Press Start 2P', monospace; }
-
         .grain-overlay {
-          position: absolute; inset: 0; pointer-events: none; z-index: 50; opacity: 0.08;
+          position: absolute; inset: 0; pointer-events: none; z-index: 50; opacity: 0.06;
           mix-blend-mode: screen;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
-
-        .chamfer-top { clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% 100%, 0 100%, 0 2px); }
-        .step-cutout { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%); }
-
         .iso-bevel {
           box-shadow: inset 2px 2px 0 rgba(255,255,255,0.3), inset -2px -2px 0 rgba(0,0,0,0.4), 2px 2px 0 ${C.black};
         }
         .iso-bevel:active {
-          box-shadow: inset 2px 2px 0 rgba(0,0,0,0.4), inset -2px -2px 0 rgba(255,255,255,0.2), 0px 0px 0 ${C.black};
+          box-shadow: inset 2px 2px 0 rgba(0,0,0,0.4), inset -2px -2px 0 rgba(255,255,255,0.2);
           transform: translate(2px, 2px);
         }
-
-        .led-text { color: ${C.amber}; text-shadow: 0 0 8px ${C.amber}; font-variant-numeric: tabular-nums; }
-
+        .led-text { color: ${C.amber}; text-shadow: 0 0 8px ${C.amber}; }
         input[type=range].bpm-slider {
           -webkit-appearance: none; background: ${C.grayDark}; height: 6px;
-          border: 1px solid ${C.black}; box-shadow: inset 1px 1px 0 rgba(0,0,0,0.5); width: 120px;
+          border: 1px solid ${C.black}; width: 100px;
         }
         input[type=range].bpm-slider::-webkit-slider-thumb {
           -webkit-appearance: none; width: 12px; height: 16px; background: ${C.gold};
           border: 1px solid ${C.black};
-          box-shadow: inset 1px 1px 0 ${C.goldLight}, inset -1px -1px 0 ${C.goldDark}, 2px 2px 0 ${C.black};
+          box-shadow: inset 1px 1px 0 ${C.goldLight}, inset -1px -1px 0 ${C.goldDark};
           cursor: pointer;
         }
-
-        input[type=range].fader-slider {
-          -webkit-appearance: none; background: ${C.black}; height: 4px; width: 80px;
-          transform: rotate(-90deg); transform-origin: center; margin: 40px 0;
+        input[type=range].vol-slider {
+          -webkit-appearance: none; background: #222; height: 4px; width: 60px;
         }
-        input[type=range].fader-slider::-webkit-slider-thumb {
-          -webkit-appearance: none; width: 16px; height: 24px; background: ${C.grayMid};
+        input[type=range].vol-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; width: 10px; height: 18px; background: ${C.grayMid};
           border: 1px solid ${C.black};
-          box-shadow: inset 0 10px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.4), 0 2px 0 rgba(0,0,0,0.5);
-          cursor: pointer; border-radius: 0;
+          box-shadow: inset 0 8px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.4);
+          cursor: pointer;
         }
-
-        ::-webkit-scrollbar { height: 12px; width: 12px; }
-        ::-webkit-scrollbar-track { background: ${C.bgDeep}; border-top: 2px solid ${C.black}; }
+        ::-webkit-scrollbar { height: 10px; width: 10px; }
+        ::-webkit-scrollbar-track { background: ${C.bgDeep}; }
         ::-webkit-scrollbar-thumb { background: ${C.cobalt}; border: 2px solid ${C.black}; }
       `}</style>
 
       <div className="grain-overlay" />
 
-      <div className="absolute inset-0 z-0 opacity-15 pointer-events-none flex items-center justify-center overflow-hidden">
-        <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" style={{ imageRendering: 'pixelated' }}>
-          <IsoFloor />
-          <g>
-            {[...Array(5)].map((_, i) => (
-              <rect key={`panel-l-${i}`} x="20" y={20 + i * 40} width="60" height="30" fill="#222233" stroke="#111" />
-            ))}
-            {[...Array(5)].map((_, i) => (
-              <rect key={`panel-r-${i}`} x="320" y={20 + i * 40} width="60" height="30" fill="#222233" stroke="#111" />
-            ))}
-          </g>
-          <g transform="translate(120, 20)">
-            <rect x="0" y="0" width="160" height="80" fill="#0a0a1a" stroke="#111" strokeWidth="2" />
-            <rect x="5" y="5" width="150" height="70" fill="#111122" />
-            <rect x="60" y="30" width="40" height="40" fill="#000" />
-            <rect x="70" y="10" width="20" height="20" fill="#000" />
-            <rect x="75" y="25" width="10" height="5" fill="#000" />
-          </g>
-          <g transform="translate(130, 30)">
-            <text x="0" y="15" fill="#ff0000" fontSize="12" fontFamily="'Press Start 2P'" style={{ textShadow: '0 0 8px #ff0000' }}>ON AIR</text>
-            <text x="90" y="15" fill="#ffaa00" fontSize="12" fontFamily="'Press Start 2P'" className="animate-pulse" style={{ textShadow: '0 0 8px #ffaa00' }}>REC</text>
-          </g>
-          <g transform="translate(80, 150)">
-            <polygon points="0,50 40,0 200,0 240,50" fill={C.cobalt} stroke="#111" strokeWidth="2" />
-            <polygon points="0,50 240,50 240,60 0,60" fill={C.cobaltDark} stroke="#111" strokeWidth="2" />
-            {[...Array(16)].map((_, i) => (
-              <rect key={`fader-${i}`} x={30 + i * 11} y="15" width="4" height="25" fill="#555" transform="skewX(-38)" />
-            ))}
-          </g>
-          <g transform="translate(40, 110)">
-            <polygon points="0,10 20,0 40,10 20,20" fill="#222" stroke="#111" />
-            <polygon points="0,10 20,20 20,60 0,50" fill="#111" stroke="#111" />
-            <polygon points="20,20 40,10 40,50 20,60" fill="#0a0a0a" stroke="#111" />
-            <circle cx="20" cy="35" r="8" fill="#333" /><circle cx="20" cy="35" r="4" fill="#111" />
-          </g>
-          <g transform="translate(320, 110)">
-            <polygon points="0,10 20,0 40,10 20,20" fill="#222" stroke="#111" />
-            <polygon points="0,10 20,20 20,60 0,50" fill="#111" stroke="#111" />
-            <polygon points="20,20 40,10 40,50 20,60" fill="#0a0a0a" stroke="#111" />
-            <circle cx="20" cy="35" r="8" fill="#333" /><circle cx="20" cy="35" r="4" fill="#111" />
-          </g>
-          <g transform="translate(340, 180)">
-            <rect x="0" y="0" width="50" height="80" fill="#222" stroke="#111" strokeWidth="2" />
-            {[...Array(6)].map((_, i) => (
-              <g key={`rack-${i}`} transform={`translate(5, ${5 + i * 12})`}>
-                <rect x="0" y="0" width="40" height="10" fill="#111" />
-                <rect x="2" y="2" width="4" height="6" fill="#f00" opacity="0.8" />
-                <rect x="8" y="2" width="4" height="6" fill="#f00" opacity="0.4" />
-                <rect x="14" y="2" width="4" height="6" fill="#0f0" opacity="0.6" />
-              </g>
-            ))}
-          </g>
-        </svg>
-      </div>
-
-      <header className="relative z-30 flex flex-col md:flex-row justify-between items-start md:items-center px-[24px] py-[16px] border-b-[3px] border-[#111]" style={{ backgroundColor: C.cobalt }}>
-        <div className="flex flex-col gap-[8px] mb-4 md:mb-0">
-          <div className="text-[11px] text-white drop-shadow-[2px_2px_0_#111]">
-            {city.emoji} {city.name.toUpperCase()} STUDIO
+      <header className="relative z-30 flex justify-between items-center px-[16px] py-[10px] border-b-[3px] border-[#111] flex-shrink-0" style={{ backgroundColor: C.cobalt }}>
+        <div className="flex items-center gap-[12px]">
+          <div className="text-[9px] text-white drop-shadow-[2px_2px_0_#111]">
+            {city.emoji} {city.name.toUpperCase()}
           </div>
-          <div className="flex items-center gap-[12px] text-[8px] text-[#87ceeb]">
-            <span className="bg-[#002266] px-[6px] py-[4px] border border-[#111]">{city.genre.toUpperCase()}</span>
-            <span className="flex items-center gap-[6px] bg-[#111] px-[8px] py-[4px] border border-[#334455]">
-              BPM: <span className="led-text text-[10px]">{bpm.toString().padStart(3, '0')}</span>
-            </span>
-          </div>
+          <span className="bg-[#002266] px-[6px] py-[3px] border border-[#111] text-[7px] text-[#87ceeb]">{city.genre.toUpperCase()}</span>
         </div>
 
-        <div className="flex flex-col items-center gap-[6px] bg-[#002266] p-[8px] border-2 border-[#111] shadow-[inset_2px_2px_0_rgba(0,0,0,0.3)]">
-          <div className="text-[#87ceeb] text-[6px] tracking-widest w-full flex justify-between">
-            <span>TEMPO</span>
-            <span>SHUFFLE</span>
-          </div>
-          <div className="flex gap-[16px]">
-            <input
-              type="range" min="60" max="200" value={bpm}
-              onChange={(e) => setBpm(parseInt(e.target.value))}
-              className="bpm-slider"
-            />
-            <input
-              type="range" min="0" max="100" defaultValue="50"
-              className="bpm-slider" style={{ width: '60px' }}
-            />
-          </div>
+        <div className="flex items-center gap-[8px]">
+          <span className="text-[7px] text-[#87ceeb]">BPM</span>
+          <span className="led-text text-[10px]">{bpm.toString().padStart(3, '0')}</span>
+          <input type="range" min="60" max="200" value={bpm} onChange={(e) => setBpm(parseInt(e.target.value))} className="bpm-slider" />
         </div>
 
-        <div className="flex gap-[12px] mt-4 md:mt-0 bg-[#002266] p-[8px] border-2 border-[#111] shadow-[inset_2px_2px_0_rgba(0,0,0,0.3)]">
-          <button
-            onClick={handlePlayToggle}
-            className="relative px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none flex items-center gap-[6px]"
-            style={{ backgroundColor: isPlaying ? C.redBright : C.green }}
-          >
-            <div className="w-[6px] h-[6px] bg-white shadow-[inset_1px_1px_0_#ccc]" />
-            {isPlaying ? 'STOP ■' : 'PLAY ▶'}
+        <div className="flex gap-[8px]">
+          <button onClick={handlePlayToggle} className="px-[12px] py-[8px] text-[7px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none" style={{ backgroundColor: isPlaying ? C.redBright : C.green }}>
+            {isPlaying ? '■ STOP' : '▶ PLAY'}
           </button>
-          <button
-            onClick={handleFinish}
-            className="px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none"
-            style={{ backgroundColor: C.cobaltLight }}
-          >
+          <button onClick={handleFinish} className="px-[12px] py-[8px] text-[7px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none" style={{ backgroundColor: C.cobaltLight }}>
             FINISH ►
           </button>
-          <button
-            onClick={() => setLocation('/map')}
-            className="px-[16px] py-[12px] text-[8px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none"
-            style={{ backgroundColor: C.grayDark }}
-          >
+          <button onClick={() => setLocation('/map')} className="px-[12px] py-[8px] text-[7px] text-white border-[2px] border-[#111] iso-bevel outline-none transition-none" style={{ backgroundColor: C.grayDark }}>
             ← MAP
           </button>
         </div>
       </header>
 
-      <main className="relative z-20 flex flex-1 overflow-hidden">
-        <div className="hidden lg:flex w-[120px] flex-col items-center justify-center border-r-[3px] border-[#111] bg-[#111] shadow-[inset_-4px_0_12px_rgba(0,0,0,0.8)] px-[16px]">
-          <div className="w-full aspect-square bg-[#222] border-[4px] border-[#333] flex items-center justify-center shadow-[4px_4px_0_#000]">
-            <div className="w-[80%] aspect-square bg-[#1a1a1a] border-[2px] border-[#0a0a0a] flex items-center justify-center">
-              <div className="w-[40%] aspect-square bg-[#111] border-[2px] border-[#222] shadow-[inset_0_4px_4px_rgba(0,0,0,0.8)]" />
+      <main className="relative z-20 flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-auto p-[12px]">
+          <div className="flex mb-[2px]">
+            <div className="w-[120px] flex-shrink-0" />
+            <div className="flex-1 flex gap-[2px] min-w-[512px]">
+              {[...Array(16)].map((_, i) => {
+                const isBeat = i % 4 === 0;
+                const beatNum = Math.floor(i / 4) + 1;
+                const colors = [C.pink, C.cyan, C.yellow, C.orange];
+                return (
+                  <div key={`ruler-${i}`} className="flex-1 flex justify-center items-center text-[7px] py-[4px]" style={{ color: isBeat ? colors[beatNum - 1] : '#334455' }}>
+                    {isBeat ? beatNum : '·'}
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <div className="w-full aspect-square bg-[#222] border-[4px] border-[#333] flex items-center justify-center shadow-[4px_4px_0_#000] mt-[24px]">
-            <div className="w-[80%] aspect-square bg-[#1a1a1a] border-[2px] border-[#0a0a0a] flex items-center justify-center">
-              <div className="w-[40%] aspect-square bg-[#111] border-[2px] border-[#222] shadow-[inset_0_4px_4px_rgba(0,0,0,0.8)]" />
-            </div>
-          </div>
-        </div>
 
-        <div className="flex-1 flex flex-col overflow-x-auto p-[16px] md:p-[24px]">
-          <div className="min-w-[800px] flex flex-col gap-[8px]">
-            <div className="flex mb-[4px]">
-              <div className="w-[100px] flex-shrink-0" />
-              <div className="flex-1 flex gap-[4px] bg-[#111] border-2 border-[#334455] p-[4px] shadow-[inset_2px_2px_0_rgba(0,0,0,0.5)]">
-                {[...Array(16)].map((_, i) => {
-                  let content: React.ReactNode = <span className="text-[#334455]">#</span>;
-                  let color = C.white;
-                  if (i === 0) { content = <>1</>; color = C.pink; }
-                  else if (i === 4) { content = <>2</>; color = C.cyan; }
-                  else if (i === 8) { content = <>3</>; color = C.yellow; }
-                  else if (i === 12) { content = <>4</>; color = C.orange; }
-                  return (
-                    <div key={`ruler-${i}`} className="flex-1 flex justify-center items-center text-[8px]" style={{ color }}>
-                      {content}
-                    </div>
-                  );
-                })}
+          <div className="flex flex-col gap-[2px] bg-[#0a0a18] border-2 border-[#222] p-[4px]" style={{ boxShadow: '4px 4px 0 #000' }}>
+            {tracks.map((track, tIdx) => {
+              const inst = channels[tIdx];
+              if (!inst) return null;
+              const isMuted = mutes[tIdx];
+              const isSoloed = solos[tIdx];
+              const isActive = !isMuted && (!hasSolo || isSoloed);
+              const isSelected = selectedTrack === tIdx;
+
+              return (
+                <div key={`track-${tIdx}`} className="flex gap-[2px] items-center" style={{ opacity: isActive ? 1 : 0.4 }}>
+                  <div
+                    className="w-[120px] flex-shrink-0 flex items-center gap-[4px] px-[4px] py-[2px] border border-[#222] cursor-pointer"
+                    style={{ backgroundColor: isSelected ? '#1a2a4a' : '#0d0d20' }}
+                    onClick={() => setSelectedTrack(tIdx)}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); toggleMute(tIdx); }} className="px-[4px] py-[2px] text-[5px] border border-[#111]" style={{ backgroundColor: isMuted ? C.muteActive : C.muteBg, color: isMuted ? '#000' : '#886644' }}>
+                      M
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); toggleSolo(tIdx); }} className="px-[4px] py-[2px] text-[5px] border border-[#111]" style={{ backgroundColor: isSoloed ? C.soloActive : C.soloBg, color: isSoloed ? '#000' : '#446688' }}>
+                      S
+                    </button>
+                    <span className="text-[5px] truncate flex-1" style={{ color: isSelected ? C.cyan : '#778899' }}>{inst.name.toUpperCase()}</span>
+                  </div>
+
+                  <div className="flex-1 flex gap-[2px] min-w-[512px]">
+                    {track.map((isOn, sIdx) => {
+                      const isDownbeat = sIdx % 4 === 0;
+                      const isCurrent = isPlaying && currentStep === sIdx;
+                      let bg = isOn ? C.stepOn : (isDownbeat ? C.stepOffBeat : C.stepOff);
+                      if (isCurrent && isOn) bg = C.stepOnBright;
+                      else if (isCurrent) bg = '#2a3a5a';
+                      return (
+                        <button
+                          key={`step-${tIdx}-${sIdx}`}
+                          onClick={() => toggleStep(tIdx, sIdx)}
+                          className="flex-1 h-[18px] border border-[#0a0a14] outline-none transition-none relative"
+                          style={{
+                            backgroundColor: bg,
+                            boxShadow: isOn ? `inset 1px 1px 0 ${C.stepOnBright}, 0 0 4px ${C.stepOn}` : `inset 1px 1px 0 rgba(255,255,255,0.05)`,
+                          }}
+                        >
+                          {isCurrent && <div className="absolute inset-0 border border-white opacity-60" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-[8px] mt-[12px]">
+            <div className="flex-1 bg-[#0d0d20] border-2 border-[#222] p-[8px]" style={{ boxShadow: '3px 3px 0 #000' }}>
+              <div className="text-[6px] text-[#556677] mb-[6px] border-b border-[#222] pb-[4px]">
+                CH {selectedTrack + 1}: {channels[selectedTrack]?.name.toUpperCase() || '---'}
+              </div>
+              <div className="flex gap-[12px] items-end">
+                <div className="flex flex-col items-center gap-[4px]">
+                  <span className="text-[5px] text-[#556677]">VOL</span>
+                  <input type="range" min="0" max="100" value={volumes[selectedTrack]} onChange={(e) => { const v = [...volumes]; v[selectedTrack] = parseInt(e.target.value); setVolumes(v); }} className="vol-slider" />
+                  <span className="text-[6px] led-text">{volumes[selectedTrack]}</span>
+                </div>
+                <div className="flex flex-col items-center gap-[4px]">
+                  <span className="text-[5px] text-[#556677]">FILTER</span>
+                  <input type="range" min="0" max="100" value={filterValues[selectedTrack]} onChange={(e) => { const f = [...filterValues]; f[selectedTrack] = parseInt(e.target.value); setFilterValues(f); }} className="vol-slider" />
+                  <span className="text-[6px] led-text">{filterValues[selectedTrack]}</span>
+                </div>
+                <div className="flex gap-[6px]">
+                  <button onClick={() => toggleMute(selectedTrack)} className="px-[8px] py-[6px] text-[6px] border-2 border-[#111] iso-bevel" style={{ backgroundColor: mutes[selectedTrack] ? C.muteActive : C.muteBg, color: mutes[selectedTrack] ? '#000' : '#886644' }}>
+                    MUTE
+                  </button>
+                  <button onClick={() => toggleSolo(selectedTrack)} className="px-[8px] py-[6px] text-[6px] border-2 border-[#111] iso-bevel" style={{ backgroundColor: solos[selectedTrack] ? C.soloActive : C.soloBg, color: solos[selectedTrack] ? '#000' : '#446688' }}>
+                    SOLO
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-[8px] mb-[24px] bg-[#002266] p-[8px] border-2 border-[#111] shadow-[4px_4px_0_#111]">
-              {tracks.map((track, tIdx) => (
-                <div key={`track-${tIdx}`} className="flex gap-[4px]">
-                  {track.map((isActive, sIdx) => {
-                    const isDownbeat = sIdx % 4 === 0;
-                    const isCurrent = isPlaying && currentStep === sIdx;
-                    let bg = isActive ? C.gold : (isDownbeat ? C.stepInactiveDown : C.stepInactive);
-                    let shadow = isActive
-                      ? `inset 2px 2px 0 ${C.goldLight}, inset -2px -2px 0 ${C.goldDark}, inset 0 0 3px #ffdd44`
-                      : `inset 2px 2px 0 ${C.stepBevelTop}, inset -2px -2px 0 ${C.stepBevelBot}`;
-                    if (isCurrent) shadow += `, 0 0 8px ${C.white}`;
-                    return (
-                      <button
-                        key={`step-${tIdx}-${sIdx}`}
-                        onClick={() => toggleStep(tIdx, sIdx)}
-                        className={`flex-1 aspect-square border border-[#111] step-cutout outline-none transition-none relative ${isCurrent ? 'ring-2 ring-white z-10' : ''}`}
-                        style={{ backgroundColor: bg, boxShadow: shadow }}
-                      >
-                        {isActive && <div className="absolute top-[2px] left-[2px] w-[4px] h-[2px] bg-white opacity-60" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-[8px]">
-              {channels.map((ch, cIdx) => (
-                <div key={ch.id} className="flex-1 flex flex-col border-[2px] border-[#111] shadow-[4px_4px_0_#111] bg-[#111]">
-                  <div className="chamfer-top p-[6px] text-center border-b-[2px] border-[#111] flex flex-col items-center gap-[4px]" style={{ backgroundColor: C.cobalt }}>
-                    <div className="flex items-center gap-[4px]">
-                      <div className="w-[4px] h-[4px] bg-[#ff0000] shadow-[0_0_4px_#f00]" />
-                      <span className="text-[6px] text-white">CH {cIdx + 1}</span>
-                    </div>
-                    <div className="w-full bg-white text-[#111] text-[6px] p-[4px] border-[2px] border-[#111] flex justify-between items-center shadow-[inset_1px_1px_0_rgba(0,0,0,0.2)]">
-                      <span className="truncate">{ch.name.toUpperCase()}</span>
-                      <span>▼</span>
-                    </div>
-                  </div>
-                  <div className="p-[8px] flex flex-col items-center gap-[12px] flex-1 bg-[#1a1a2e] relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(0deg, transparent 24%, #ffffff 25%, #ffffff 26%, transparent 27%, transparent 74%, #ffffff 75%, #ffffff 76%, transparent 77%, transparent)', backgroundSize: '100% 10px' }} />
-                    <div className="flex w-full justify-between gap-[4px] relative z-10">
-                      <button
-                        onClick={() => toggleEffect('REV', cIdx)}
-                        className="flex-1 flex flex-col items-center gap-[2px] bg-[#002266] p-[4px] border-[2px] border-[#111] iso-bevel outline-none"
-                      >
-                        <div className={`w-[4px] h-[4px] border border-[#111] ${revToggles[cIdx] ? 'bg-[#ff0000] shadow-[0_0_6px_#f00]' : 'bg-[#440000]'}`} />
-                        <span className="text-[5px]">REV</span>
-                      </button>
-                      <button
-                        onClick={() => toggleEffect('DIS', cIdx)}
-                        className="flex-1 flex flex-col items-center gap-[2px] bg-[#002266] p-[4px] border-[2px] border-[#111] iso-bevel outline-none"
-                      >
-                        <div className={`w-[4px] h-[4px] border border-[#111] ${disToggles[cIdx] ? 'bg-[#ff0000] shadow-[0_0_6px_#f00]' : 'bg-[#440000]'}`} />
-                        <span className="text-[5px]">DIS</span>
-                      </button>
-                    </div>
-                    <div className="flex-1 flex items-center justify-center relative z-10 my-[20px]">
-                      <input
-                        type="range" min="0" max="100"
-                        value={volumes[cIdx]}
-                        onChange={(e) => {
-                          const newVols = [...volumes];
-                          newVols[cIdx] = parseInt(e.target.value);
-                          setVolumes(newVols);
-                        }}
-                        className="fader-slider"
-                      />
-                    </div>
+            {showProducer && producer && (
+              <div className="w-[220px] bg-[#0d0d20] border-2 border-[#222] p-[8px] flex gap-[8px] relative" style={{ boxShadow: '3px 3px 0 #000' }}>
+                <button onClick={() => setShowProducer(false)} className="absolute top-[2px] right-[4px] text-[6px] text-[#556677] hover:text-white">X</button>
+                <svg viewBox="0 0 24 40" width="36" height="60" style={{ imageRendering: 'pixelated', flexShrink: 0 }}>
+                  <rect x="6" y="2" width="12" height="10" fill={producer.skinTone} />
+                  <rect x="8" y="5" width="3" height="2" fill="#111" />
+                  <rect x="13" y="5" width="3" height="2" fill="#111" />
+                  <rect x="7" y="0" width="10" height="3" fill="#111" />
+                  <rect x="4" y="12" width="16" height="14" fill={producer.topColor} />
+                  <rect x="2" y="14" width="4" height="10" fill={producer.topColor} />
+                  <rect x="18" y="14" width="4" height="10" fill={producer.topColor} />
+                  <rect x="2" y="23" width="4" height="3" fill={producer.skinTone} />
+                  <rect x="18" y="23" width="4" height="3" fill={producer.skinTone} />
+                  <rect x="6" y="26" width="12" height="10" fill="#334455" />
+                  <rect x="4" y="36" width="7" height="4" fill="#111" />
+                  <rect x="13" y="36" width="7" height="4" fill="#111" />
+                  {producer.accessory === 'headphones' && (
+                    <>
+                      <rect x="4" y="1" width="3" height="6" fill="#333" />
+                      <rect x="17" y="1" width="3" height="6" fill="#333" />
+                      <rect x="5" y="0" width="14" height="2" fill="#333" />
+                    </>
+                  )}
+                  {producer.accessory === 'bandana' && (
+                    <rect x="6" y="1" width="12" height="3" fill="#cc3300" />
+                  )}
+                </svg>
+                <div className="flex-1 flex flex-col gap-[4px]">
+                  <div className="text-[6px] text-[#ff3399]">{producer.name}</div>
+                  <div className="bg-[#1a1a2e] border border-[#334455] p-[4px] text-[5px] text-[#87ceeb] leading-[8px] relative">
+                    <div className="absolute -left-[4px] top-[6px] w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-r-[4px] border-r-[#334455]" />
+                    "{producer.quote}"
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
-      <footer className="relative z-30 bg-[#111] border-t-[3px] border-[#334455] px-[24px] py-[8px] flex justify-between items-center flex-shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.5)]">
-        <div className="text-[7px]">
+      <footer className="relative z-30 bg-[#111] border-t-[3px] border-[#222] px-[16px] py-[6px] flex justify-between items-center flex-shrink-0">
+        <div className="text-[6px]">
           {audioReady ? (
-            <span className="text-[#44cc00] drop-shadow-[0_0_4px_#44cc00]">◉ AUDIO ENGINE READY</span>
+            <span className="text-[#44cc00] drop-shadow-[0_0_4px_#44cc00]">◉ AUDIO READY</span>
           ) : (
-            <span className="text-[#ffee00] animate-pulse drop-shadow-[0_0_4px_#ffee00]">○ CLICK TO ENABLE AUDIO</span>
+            <span className="text-[#ffee00] animate-pulse">○ CLICK TO ENABLE</span>
           )}
         </div>
-        <div className="text-[7px]">
-          <span className="text-[#87ceeb]">{city.emoji} {city.venue.toUpperCase()} // VOLT-909</span>
+        <div className="text-[6px] text-[#87ceeb]">
+          {city.emoji} {city.venue.toUpperCase()} // HAMMERHEAD-909
         </div>
-        <div className="text-[#ff3399] text-[7px] drop-shadow-[0_0_4px_#ff3399]">
+        <div className="text-[6px]">
           {isPlaying ? (
-            <span>► PLAYING · STEP {(currentStep + 1).toString().padStart(2, '0')}/16</span>
+            <span className="text-[#ff3399] drop-shadow-[0_0_4px_#ff3399]">► STEP {(currentStep + 1).toString().padStart(2, '0')}/16</span>
           ) : (
-            <span className="text-[#888899] drop-shadow-none">■ STOPPED</span>
+            <span className="text-[#888899]">■ STOPPED</span>
           )}
         </div>
       </footer>

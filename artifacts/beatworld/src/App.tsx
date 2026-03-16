@@ -12,6 +12,7 @@ import PerformanceScreen from "@/pages/PerformanceScreen";
 import ReviewScreen from "@/pages/ReviewScreen";
 import SocialScreen from "@/pages/SocialScreen";
 import LeaderboardScreen from "@/pages/LeaderboardScreen";
+import ProfileScreen from "@/pages/ProfileScreen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/review/:cityId" component={ReviewScreen} />
       <Route path="/social" component={SocialScreen} />
       <Route path="/leaderboard" component={LeaderboardScreen} />
+      <Route path="/profile" component={ProfileScreen} />
       <Route component={NotFound} />
     </Switch>
   );

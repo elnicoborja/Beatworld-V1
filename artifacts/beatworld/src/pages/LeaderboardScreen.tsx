@@ -6,12 +6,9 @@ const C = {
   cream: '#fff8e7',
   creamDark: '#fff0d0',
   hotPink: '#ff3399',
-  magenta: '#cc0066',
   yellow: '#ffee00',
   cobalt: '#0050cc',
   black: '#111111',
-  grayMid: '#888888',
-  grayDark: '#334455',
   bronze: '#cc6600',
   silver: '#888888',
   gold: '#ffcc00',
@@ -102,11 +99,28 @@ interface LeaderEntry {
 
 const FALLBACK_DATA: LeaderEntry[] = [
   { rank: 1, name: 'DJ METRO', cities: 18, clout: 942000, isCurrent: false, avatarTop: '#0050cc' },
-  { rank: 2, name: 'SONIC BOOM', cities: 15, clout: 850500, isCurrent: false, avatarTop: '#ff8800' },
-  { rank: 3, name: 'KILLA K', cities: 12, clout: 710000, isCurrent: false, avatarTop: '#44cc00' },
-  { rank: 5, name: 'BEATMASTER', cities: 6, clout: 420000, isCurrent: false, avatarTop: '#00aaaa' },
-  { rank: 6, name: 'WUBWUB', cities: 4, clout: 210000, isCurrent: false, avatarTop: '#cc3300' },
-  { rank: 7, name: 'SYS_ERROR', cities: 2, clout: 95000, isCurrent: false, avatarTop: '#6600cc' },
+  { rank: 2, name: 'SONIC BOOM', cities: 18, clout: 850500, isCurrent: false, avatarTop: '#ff8800' },
+  { rank: 3, name: 'KILLA K', cities: 17, clout: 810000, isCurrent: false, avatarTop: '#44cc00' },
+  { rank: 4, name: 'QUEEN BEE', cities: 16, clout: 775000, isCurrent: false, avatarTop: '#ff3399' },
+  { rank: 5, name: 'BEATMASTER', cities: 15, clout: 720000, isCurrent: false, avatarTop: '#00aaaa' },
+  { rank: 6, name: 'YUNG FREQ', cities: 14, clout: 668000, isCurrent: false, avatarTop: '#ffee00' },
+  { rank: 7, name: 'MC BINARY', cities: 13, clout: 610000, isCurrent: false, avatarTop: '#6600cc' },
+  { rank: 8, name: 'VINYL VIPER', cities: 12, clout: 555000, isCurrent: false, avatarTop: '#cc3300' },
+  { rank: 9, name: 'DJ CRATE', cities: 12, clout: 520000, isCurrent: false, avatarTop: '#003399' },
+  { rank: 10, name: 'BASS QUAKE', cities: 11, clout: 488000, isCurrent: false, avatarTop: '#ff8800' },
+  { rank: 11, name: 'PIXEL WAVE', cities: 10, clout: 445000, isCurrent: false, avatarTop: '#44cc00' },
+  { rank: 12, name: 'NEON PULSE', cities: 9, clout: 410000, isCurrent: false, avatarTop: '#00ffff' },
+  { rank: 13, name: 'SYNTH LORD', cities: 8, clout: 380000, isCurrent: false, avatarTop: '#ff00ff' },
+  { rank: 14, name: 'TROPICANA', cities: 8, clout: 355000, isCurrent: false, avatarTop: '#ff3399' },
+  { rank: 15, name: 'DEMBOW KING', cities: 7, clout: 310000, isCurrent: false, avatarTop: '#ffaa00' },
+  { rank: 16, name: 'CLOUD NINE', cities: 6, clout: 275000, isCurrent: false, avatarTop: '#87ceeb' },
+  { rank: 17, name: 'WUBWUB', cities: 5, clout: 210000, isCurrent: false, avatarTop: '#cc3300' },
+  { rank: 18, name: 'STATIC KID', cities: 4, clout: 175000, isCurrent: false, avatarTop: '#888888' },
+  { rank: 19, name: 'GHOST FREQ', cities: 3, clout: 140000, isCurrent: false, avatarTop: '#334455' },
+  { rank: 20, name: 'LOFI LUCY', cities: 3, clout: 120000, isCurrent: false, avatarTop: '#ff9999' },
+  { rank: 21, name: 'SYS_ERROR', cities: 2, clout: 95000, isCurrent: false, avatarTop: '#6600cc' },
+  { rank: 22, name: 'ROOKIE RAY', cities: 1, clout: 50000, isCurrent: false, avatarTop: '#00aa00' },
+  { rank: 23, name: 'FRESH FACE', cities: 1, clout: 25000, isCurrent: false, avatarTop: '#0050cc' },
 ];
 
 const formatClout = (num: number) => num.toLocaleString('en-US');
@@ -130,10 +144,19 @@ export default function LeaderboardScreen() {
       }));
     }
     const playerEntry: LeaderEntry = {
-      rank: 4, name: state.playerName.toUpperCase(), cities: state.completedCities.length,
+      rank: 0, name: state.playerName.toUpperCase(), cities: state.completedCities.length,
       clout: state.clout, isCurrent: true, avatarTop: state.character?.topColor || '#ff3399',
     };
-    const merged = [...FALLBACK_DATA.slice(0, 3), playerEntry, ...FALLBACK_DATA.slice(3)];
+    let inserted = false;
+    const merged: LeaderEntry[] = [];
+    for (const entry of FALLBACK_DATA) {
+      if (!inserted && state.clout >= entry.clout) {
+        merged.push(playerEntry);
+        inserted = true;
+      }
+      merged.push(entry);
+    }
+    if (!inserted) merged.push(playerEntry);
     return merged.map((e, i) => ({ ...e, rank: i + 1 }));
   })();
 
@@ -249,7 +272,7 @@ export default function LeaderboardScreen() {
               const cloutClass = isTop3 ? 'glow-yellow' : '';
 
               return (
-                <div key={player.rank} className={rowClass}>
+                <div key={`${player.rank}-${player.name}`} className={rowClass}>
                   <div className="w-[64px] flex-shrink-0 flex justify-center">{rankDisplay}</div>
                   <div className="flex-1 flex items-center gap-[12px]">
                     <div className="w-[24px] h-[48px] flex-shrink-0 flex items-center justify-center">

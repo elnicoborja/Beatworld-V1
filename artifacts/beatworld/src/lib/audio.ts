@@ -1,12 +1,9 @@
-// 32-bit Audio Engine — Sega Genesis inspired synthesis via Web Audio API
-
 class AudioEngine {
   ctx: AudioContext | null = null;
   masterGain: GainNode | null = null;
   noiseBuffer: AudioBuffer | null = null;
   compressor: DynamicsCompressorNode | null = null;
 
-  /** Must be called inside a user gesture (click/touch) */
   async init() {
     if (this.ctx && this.ctx.state === 'running') return;
 
@@ -22,7 +19,6 @@ class AudioEngine {
       this.createNoiseBuffer();
     }
 
-    // Always resume — browsers suspend AudioContext until user interacts
     if (this.ctx.state === 'suspended') {
       await this.ctx.resume();
     }
@@ -46,14 +42,32 @@ class AudioEngine {
     return this.ctx ? this.ctx.currentTime : 0;
   }
 
-  /** Play a drum sound — Sega Genesis YM2612 / PSG inspired timbres */
-  playDrum(type: string, time: number) {
+  private getOutput(volume = 1.0, filterFreq?: number): { dest: AudioNode; filter?: BiquadFilterNode } {
+    if (!this.ctx || !this.masterGain) return { dest: this.masterGain! };
+    if (volume >= 1.0 && !filterFreq) return { dest: this.masterGain };
+
+    const gain = this.ctx.createGain();
+    gain.gain.value = Math.max(0, Math.min(1, volume));
+
+    if (filterFreq && filterFreq < 20000) {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = filterFreq;
+      filter.Q.value = 1;
+      gain.connect(filter).connect(this.masterGain);
+      return { dest: gain, filter };
+    }
+
+    gain.connect(this.masterGain);
+    return { dest: gain };
+  }
+
+  playDrum(type: string, time: number, volume = 1.0, filterFreq?: number) {
     if (!this.ctx || !this.masterGain || !this.isReady()) return;
-    // Clamp: never schedule in the past
     const t = Math.max(time, this.ctx.currentTime + 0.005);
+    const { dest } = this.getOutput(volume, filterFreq);
 
     if (type === 'kick') {
-      // Deep FM kick — YM2612 style
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       const mod = this.ctx.createOscillator();
@@ -70,12 +84,11 @@ class AudioEngine {
       gain.gain.setValueAtTime(1.2, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
 
-      osc.connect(gain).connect(this.masterGain);
+      osc.connect(gain).connect(dest);
       mod.start(t); osc.start(t);
       mod.stop(t + 0.18); osc.stop(t + 0.18);
     }
     else if (type === 'snare') {
-      // Noise layer
       if (this.noiseBuffer) {
         const noiseSrc = this.ctx.createBufferSource();
         noiseSrc.buffer = this.noiseBuffer;
@@ -86,10 +99,9 @@ class AudioEngine {
         const noiseGain = this.ctx.createGain();
         noiseGain.gain.setValueAtTime(0.8, t);
         noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-        noiseSrc.connect(noiseFilter).connect(noiseGain).connect(this.masterGain);
+        noiseSrc.connect(noiseFilter).connect(noiseGain).connect(dest);
         noiseSrc.start(t); noiseSrc.stop(t + 0.18);
       }
-      // Tone body
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'triangle';
@@ -97,11 +109,10 @@ class AudioEngine {
       osc.frequency.exponentialRampToValueAtTime(80, t + 0.08);
       gain.gain.setValueAtTime(0.6, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-      osc.connect(gain).connect(this.masterGain);
+      osc.connect(gain).connect(dest);
       osc.start(t); osc.stop(t + 0.12);
     }
     else if (type === 'hihat') {
-      // Metallic hi-hat using multiple detuned oscillators + noise
       const frequencies = [285, 432, 528, 747, 1068];
       frequencies.forEach(freq => {
         const osc = this.ctx!.createOscillator();
@@ -114,12 +125,11 @@ class AudioEngine {
         const dur = 0.045;
         gain.gain.setValueAtTime(0.12, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-        osc.connect(filter).connect(gain).connect(this.masterGain!);
+        osc.connect(filter).connect(gain).connect(dest);
         osc.start(t); osc.stop(t + dur);
       });
     }
     else if (type === 'perc') {
-      // 808-style conga/perc
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sine';
@@ -127,11 +137,10 @@ class AudioEngine {
       osc.frequency.exponentialRampToValueAtTime(120, t + 0.08);
       gain.gain.setValueAtTime(0.7, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-      osc.connect(gain).connect(this.masterGain);
+      osc.connect(gain).connect(dest);
       osc.start(t); osc.stop(t + 0.12);
     }
     else {
-      // Fallback generic percussive hit
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'square';
@@ -139,22 +148,23 @@ class AudioEngine {
       osc.frequency.exponentialRampToValueAtTime(100, t + 0.07);
       gain.gain.setValueAtTime(0.5, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-      osc.connect(gain).connect(this.masterGain);
+      osc.connect(gain).connect(dest);
       osc.start(t); osc.stop(t + 0.1);
     }
   }
 
-  /** Play a melodic/synth sound — Sega Genesis FM-inspired timbres */
   playSynth(
     type: 'bass' | 'lead' | 'chord' | 'arp' | 'pad' | 'fx',
     noteIndex: number,
-    time: number
+    time: number,
+    volume = 1.0,
+    filterFreq?: number
   ) {
     if (!this.ctx || !this.masterGain || !this.isReady()) return;
     const t = Math.max(time, this.ctx.currentTime + 0.005);
+    const { dest } = this.getOutput(volume, filterFreq);
 
-    // Minor pentatonic scale — C minor starting at C2
-    const rootHz = 65.41; // C2
+    const rootHz = 65.41;
     const scale = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27];
     let octaveOffset = 0;
     if (type === 'lead' || type === 'fx') octaveOffset = 2;
@@ -166,7 +176,6 @@ class AudioEngine {
     const freq = rootHz * Math.pow(2, semitones / 12);
 
     if (type === 'bass') {
-      // FM bass — Sega Genesis style
       const carrier = this.ctx.createOscillator();
       const modulator = this.ctx.createOscillator();
       const modGain = this.ctx.createGain();
@@ -181,12 +190,11 @@ class AudioEngine {
       carrier.frequency.value = freq;
       outGain.gain.setValueAtTime(0.8, t);
       outGain.gain.setTargetAtTime(0.001, t + 0.22, 0.08);
-      carrier.connect(outGain).connect(this.masterGain);
+      carrier.connect(outGain).connect(dest);
       modulator.start(t); carrier.start(t);
       modulator.stop(t + 0.35); carrier.stop(t + 0.35);
     }
     else if (type === 'lead') {
-      // Square wave lead with slight pulse width
       const osc = this.ctx.createOscillator();
       const osc2 = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -198,20 +206,19 @@ class AudioEngine {
       osc.type = 'square';
       osc.frequency.value = freq;
       osc2.type = 'square';
-      osc2.frequency.value = freq * 1.005; // slight detune
+      osc2.frequency.value = freq * 1.005;
 
       gain.gain.setValueAtTime(0, t);
       gain.gain.linearRampToValueAtTime(0.35, t + 0.01);
       gain.gain.setTargetAtTime(0.001, t + 0.15, 0.04);
 
       osc.connect(filter); osc2.connect(filter);
-      filter.connect(gain).connect(this.masterGain);
+      filter.connect(gain).connect(dest);
       osc.start(t); osc2.start(t);
       osc.stop(t + 0.22); osc2.stop(t + 0.22);
     }
     else if (type === 'chord') {
-      // FM organ/brass chord — 3 operators
-      const intervals = [0, 4, 7]; // major chord
+      const intervals = [0, 4, 7];
       intervals.forEach(interval => {
         const f = freq * Math.pow(2, interval / 12);
         const osc = this.ctx!.createOscillator();
@@ -221,12 +228,11 @@ class AudioEngine {
         gain.gain.setValueAtTime(0, t);
         gain.gain.linearRampToValueAtTime(0.18, t + 0.02);
         gain.gain.setTargetAtTime(0.001, t + 0.25, 0.12);
-        osc.connect(gain).connect(this.masterGain!);
+        osc.connect(gain).connect(dest);
         osc.start(t); osc.stop(t + 0.5);
       });
     }
     else if (type === 'arp') {
-      // Bright arpeggiated synth
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       const filter = this.ctx.createBiquadFilter();
@@ -237,11 +243,10 @@ class AudioEngine {
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.3, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-      osc.connect(filter).connect(gain).connect(this.masterGain);
+      osc.connect(filter).connect(gain).connect(dest);
       osc.start(t); osc.stop(t + 0.12);
     }
     else if (type === 'pad') {
-      // Soft triangle pad
       const osc = this.ctx.createOscillator();
       const osc2 = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -253,12 +258,11 @@ class AudioEngine {
       gain.gain.linearRampToValueAtTime(0.2, t + 0.06);
       gain.gain.setTargetAtTime(0.001, t + 0.35, 0.15);
       osc.connect(gain); osc2.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(dest);
       osc.start(t); osc2.start(t);
       osc.stop(t + 0.6); osc2.stop(t + 0.6);
     }
     else {
-      // FX: pitch sweep
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sawtooth';
@@ -266,7 +270,7 @@ class AudioEngine {
       osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.3);
       gain.gain.setValueAtTime(0.25, t);
       gain.gain.setTargetAtTime(0.001, t + 0.25, 0.06);
-      osc.connect(gain).connect(this.masterGain);
+      osc.connect(gain).connect(dest);
       osc.start(t); osc.stop(t + 0.35);
     }
   }

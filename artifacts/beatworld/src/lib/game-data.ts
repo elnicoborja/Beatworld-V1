@@ -5,6 +5,14 @@ export interface Instrument {
   color: string;
 }
 
+export interface GuestProducer {
+  name: string;
+  quote: string;
+  skinTone: string;
+  topColor: string;
+  accessory: string;
+}
+
 export interface CityLevel {
   id: string;
   name: string;
@@ -17,12 +25,14 @@ export interface CityLevel {
   mediaOutlet: string;
   emoji: string;
   defaultBpm?: number;
+  guestProducer: GuestProducer;
 }
 
 export const CITIES: Record<string, CityLevel> = {
   'new-york': {
     id: 'new-york', name: 'New York', genre: 'Hip Hop', level: 1, numInstruments: 4,
     position: [-3.5, 0, -0.5], venue: 'Madison Square Garden', mediaOutlet: 'XXL Mag', emoji: '🗽',
+    guestProducer: { name: 'DJ PRIMO', quote: 'CHOP THE SAMPLE, FLIP THE BEAT. BOOM BAP FOREVER.', skinTone: '#8d5524', topColor: '#111133', accessory: 'headphones' },
     instruments: [
       { id: 'kick1', name: '808 Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Snare', type: 'snare', color: 'bg-orange-500' },
@@ -33,6 +43,7 @@ export const CITIES: Record<string, CityLevel> = {
   'los-angeles': {
     id: 'los-angeles', name: 'Los Angeles', genre: 'West Coast Hip Hop', level: 1, numInstruments: 6,
     position: [-4.2, 0, 0.2], venue: 'Crypto.com Arena', mediaOutlet: 'Rolling Stone', emoji: '🌴',
+    guestProducer: { name: 'DR. SYNTH', quote: 'G-FUNK ERA. KEEP IT SMOOTH, KEEP IT WEST SIDE.', skinTone: '#6f4e37', topColor: '#ffffff', accessory: 'bandana' },
     instruments: [
       { id: 'kick1', name: 'Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Clap', type: 'snare', color: 'bg-orange-500' },
@@ -45,6 +56,7 @@ export const CITIES: Record<string, CityLevel> = {
   'puerto-rico': {
     id: 'puerto-rico', name: 'Puerto Rico', genre: 'Reggaeton', level: 2, numInstruments: 6,
     position: [-2.5, 0, 0.8], venue: 'Coliseo de Puerto Rico', mediaOutlet: 'Billboard Latina', emoji: '🏖️',
+    guestProducer: { name: 'LUNY', quote: 'DEMBOW RIDDIM NEVER DIES. MAS GASOLINA PARA EL BEAT.', skinTone: '#c68642', topColor: '#ff3399', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Dembow Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Dembow Snare', type: 'snare', color: 'bg-orange-500' },
@@ -56,7 +68,8 @@ export const CITIES: Record<string, CityLevel> = {
   },
   'dominican-republic': {
     id: 'dominican-republic', name: 'Santo Domingo', genre: 'Fast Dembow', level: 2, numInstruments: 8,
-    position: [-2.2, 0, 0.9], venue: 'Estadio Quisqueya', mediaOutlet: 'Listín Diario Urban', emoji: '🥁',
+    position: [-2.2, 0, 0.9], venue: 'Estadio Quisqueya', mediaOutlet: 'Listin Diario Urban', emoji: '🥁',
+    guestProducer: { name: 'BLIN BLIN', quote: 'MAS RAPIDO! DEMBOW A 140 BPM, DALE DURO!', skinTone: '#8d5524', topColor: '#ffee00', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Boom Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'kick2', name: 'Sub Kick', type: 'kick', color: 'bg-red-700' },
@@ -69,8 +82,9 @@ export const CITIES: Record<string, CityLevel> = {
     ]
   },
   'medellin': {
-    id: 'medellin', name: 'Medellín', genre: 'Reggaeton', level: 2, numInstruments: 8,
-    position: [-2.0, 0, 1.4], venue: 'Movistar Arena Medellín', mediaOutlet: 'El Colombiano', emoji: '💃',
+    id: 'medellin', name: 'Medellin', genre: 'Reggaeton', level: 2, numInstruments: 8,
+    position: [-2.0, 0, 1.4], venue: 'Movistar Arena Medellin', mediaOutlet: 'El Colombiano', emoji: '💃',
+    guestProducer: { name: 'TAINY 2.0', quote: 'EL RITMO DE MEDELLIN. NUEVA ESCUELA URBANA.', skinTone: '#c68642', topColor: '#0050cc', accessory: 'headphones' },
     instruments: [
       { id: 'kick1', name: 'Dembow Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Clap', type: 'snare', color: 'bg-orange-500' },
@@ -85,6 +99,7 @@ export const CITIES: Record<string, CityLevel> = {
   'rio': {
     id: 'rio', name: 'Rio de Janeiro', genre: 'Baile Funk', level: 3, numInstruments: 8,
     position: [-1.2, 0, 2.2], venue: 'Rock in Rio', mediaOutlet: 'Vibe Brasil', emoji: '🎭',
+    guestProducer: { name: 'MC VOLTAGEM', quote: 'BAILE FUNK E A VOZ DA FAVELA. TAMBORZAO NA CAIXA!', skinTone: '#6f4e37', topColor: '#44cc00', accessory: 'bandana' },
     instruments: [
       { id: 'kick1', name: 'Tambor Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Caixa', type: 'snare', color: 'bg-orange-500' },
@@ -99,6 +114,7 @@ export const CITIES: Record<string, CityLevel> = {
   'fortaleza': {
     id: 'fortaleza', name: 'Fortaleza', genre: 'Psytrance', level: 3, numInstruments: 10,
     position: [-0.8, 0, 1.8], venue: 'Cactus Festival', mediaOutlet: 'Mixmag Brasil', emoji: '🌵',
+    guestProducer: { name: 'SHIVA BASS', quote: 'PSY IS THE FREQUENCY OF THE UNIVERSE. 145 BPM CONSCIOUSNESS.', skinTone: '#f1c27d', topColor: '#6600cc', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Psy Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'hat1', name: 'Hi-Hat', type: 'hihat', color: 'bg-yellow-500' },
@@ -113,8 +129,9 @@ export const CITIES: Record<string, CityLevel> = {
     ]
   },
   'sao-paulo': {
-    id: 'sao-paulo', name: 'São Paulo', genre: 'Minimal Techno', level: 3, numInstruments: 10,
+    id: 'sao-paulo', name: 'Sao Paulo', genre: 'Minimal Techno', level: 3, numInstruments: 10,
     position: [-1.0, 0, 2.5], venue: 'D-Edge Club', mediaOutlet: 'Resident Advisor', emoji: '🏙️',
+    guestProducer: { name: 'ANNA TECH', quote: 'MINIMAL IS MAXIMAL. LET THE GROOVE SPEAK.', skinTone: '#f1c27d', topColor: '#111133', accessory: 'headphones' },
     instruments: [
       { id: 'kick1', name: 'Minimal Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Clap', type: 'snare', color: 'bg-orange-500' },
@@ -129,8 +146,9 @@ export const CITIES: Record<string, CityLevel> = {
     ]
   },
   'bogota': {
-    id: 'bogota', name: 'Bogotá', genre: 'Drum & Bass', level: 4, numInstruments: 10,
+    id: 'bogota', name: 'Bogota', genre: 'Drum & Bass', level: 4, numInstruments: 10,
     position: [-1.8, 0, 1.2], venue: 'Baum Club', mediaOutlet: 'DJ Mag Colombia', emoji: '🎵',
+    guestProducer: { name: 'JUNGLE JC', quote: 'BREAKBEATS FROM THE ANDES. REESE BASS HITS DIFFERENT UP HERE.', skinTone: '#c68642', topColor: '#ff8800', accessory: 'bandana' },
     instruments: [
       { id: 'kick1', name: 'Punch Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Snare Roll', type: 'snare', color: 'bg-orange-500' },
@@ -147,6 +165,7 @@ export const CITIES: Record<string, CityLevel> = {
   'buenos-aires': {
     id: 'buenos-aires', name: 'Buenos Aires', genre: 'Tech House', level: 4, numInstruments: 12,
     position: [-1.5, 0, 3.2], venue: 'Crobar Buenos Aires', mediaOutlet: 'Mixmag Argentina', emoji: '🏠',
+    guestProducer: { name: 'HERNAN C', quote: 'BUENOS AIRES NEVER SLEEPS. THE GROOVE IS IN OUR BLOOD.', skinTone: '#f1c27d', topColor: '#cc3300', accessory: 'headphones' },
     instruments: [
       { id: 'kick1', name: 'House Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'hat1', name: 'Hi-Hat', type: 'hihat', color: 'bg-yellow-400' },
@@ -165,6 +184,7 @@ export const CITIES: Record<string, CityLevel> = {
   'santiago': {
     id: 'santiago', name: 'Santiago de Chile', genre: 'Trap', level: 4, numInstruments: 12,
     position: [-1.7, 0, 3.5], venue: 'Movistar Arena Santiago', mediaOutlet: 'El Mercurio Hip Hop', emoji: '🎤',
+    guestProducer: { name: 'PABLITO MIX', quote: 'TRAP CHILENO CON SABOR ANDINO. 808S EN LOS ANDES.', skinTone: '#c68642', topColor: '#6600cc', accessory: 'bandana' },
     instruments: [
       { id: 'kick1', name: '808', type: 'kick', color: 'bg-red-500' },
       { id: 'hat1', name: 'Triplet Hat', type: 'hihat', color: 'bg-yellow-400' },
@@ -183,6 +203,7 @@ export const CITIES: Record<string, CityLevel> = {
   'mexico-city': {
     id: 'mexico-city', name: 'Mexico City', genre: 'Cumbia', level: 5, numInstruments: 12,
     position: [-3.2, 0, 0.8], venue: 'Foro Sol', mediaOutlet: 'Revolver Mag MX', emoji: '🌮',
+    guestProducer: { name: 'NORTEC COLLECTIVE', quote: 'CUMBIA MEETS ELECTRONICA. SONIDO DE LA FRONTERA.', skinTone: '#c68642', topColor: '#44cc00', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Caja', type: 'kick', color: 'bg-red-500' },
       { id: 'perc1', name: 'Guacharaca', type: 'perc', color: 'bg-green-400' },
@@ -201,6 +222,7 @@ export const CITIES: Record<string, CityLevel> = {
   'monterrey': {
     id: 'monterrey', name: 'Monterrey', genre: 'Tribal', level: 5, numInstruments: 14,
     position: [-3.4, 0, 0.5], venue: 'Arena Monterrey', mediaOutlet: 'DJ Mag Mexico', emoji: '🪘',
+    guestProducer: { name: 'DJ 3BALL', quote: 'TRIBAL GUARACHERO! DALE CON TODO, JEFE!', skinTone: '#c68642', topColor: '#ff8800', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Tribal Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'kick2', name: 'Bass Drum', type: 'kick', color: 'bg-red-700' },
@@ -221,6 +243,7 @@ export const CITIES: Record<string, CityLevel> = {
   'tulum': {
     id: 'tulum', name: 'Tulum', genre: 'Organic House', level: 5, numInstruments: 14,
     position: [-2.8, 0, 0.6], venue: 'Papaya Playa Project', mediaOutlet: 'Electronic Beats', emoji: '🌿',
+    guestProducer: { name: 'NICOLA ZETA', quote: 'CONNECT WITH THE EARTH. ORGANIC GROOVES, ANCIENT RHYTHMS.', skinTone: '#f1c27d', topColor: '#00aaaa', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Hand Drum', type: 'kick', color: 'bg-red-500' },
       { id: 'bass1', name: 'Deep Bass', type: 'bass', color: 'bg-purple-500' },
@@ -241,6 +264,7 @@ export const CITIES: Record<string, CityLevel> = {
   'berlin': {
     id: 'berlin', name: 'Berlin', genre: 'Techno', level: 6, numInstruments: 14,
     position: [2.0, 0, -1.2], venue: 'Berghain', mediaOutlet: 'Groove Magazine', emoji: '⚡',
+    guestProducer: { name: 'BEN KLOCK JR', quote: 'THE WAREHOUSE IS THE TEMPLE. FOUR ON THE FLOOR, NOTHING MORE.', skinTone: '#f1c27d', topColor: '#111133', accessory: 'headphones' },
     instruments: [
       { id: 'kick1', name: 'Deep Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'kick2', name: 'Rumble Kick', type: 'kick', color: 'bg-red-700' },
@@ -261,6 +285,7 @@ export const CITIES: Record<string, CityLevel> = {
   'london': {
     id: 'london', name: 'London', genre: 'Drum and Bass', level: 6, numInstruments: 14,
     position: [1.5, 0, -1.5], venue: 'Fabric London', mediaOutlet: 'DJ Mag UK', emoji: '🇬🇧',
+    guestProducer: { name: 'MC SKIBADEE JR', quote: 'JUNGLE IS MASSIVE! RINSE OUT THE DANCE.', skinTone: '#6f4e37', topColor: '#cc3300', accessory: 'bandana' },
     instruments: [
       { id: 'kick1', name: 'Punch Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Tight Snare', type: 'snare', color: 'bg-orange-500' },
@@ -281,6 +306,7 @@ export const CITIES: Record<string, CityLevel> = {
   'newcastle': {
     id: 'newcastle', name: 'Newcastle', genre: 'Jungle', level: 6, numInstruments: 16,
     position: [1.7, 0, -1.7], venue: 'Digital Newcastle', mediaOutlet: 'Juno Records Blog', emoji: '🌿',
+    guestProducer: { name: 'GENERAL LEVY 2', quote: 'INCREDIBLE! JUNGLIST MASSIVE IN THE AREA!', skinTone: '#6f4e37', topColor: '#44cc00', accessory: 'none' },
     instruments: [
       { id: 'kick1', name: 'Amen Kick', type: 'kick', color: 'bg-red-500' },
       { id: 'snare1', name: 'Amen Snare', type: 'snare', color: 'bg-orange-500' },
@@ -303,6 +329,7 @@ export const CITIES: Record<string, CityLevel> = {
   'brighton': {
     id: 'brighton', name: 'Brighton', genre: 'Broken Beat', level: 6, numInstruments: 16,
     position: [1.6, 0, -1.4], venue: 'Patterns Brighton', mediaOutlet: 'Wire Magazine', emoji: '🎼',
+    guestProducer: { name: 'BUGZ IN THE ATTIC', quote: 'BREAK THE BEAT, BEND THE GROOVE. WEST LONDON TO THE WORLD.', skinTone: '#6f4e37', topColor: '#ff3399', accessory: 'headphones' },
     instruments: [
       { id: 'kick1', name: 'Congas L', type: 'kick', color: 'bg-red-500' },
       { id: 'kick2', name: 'Congas R', type: 'kick', color: 'bg-red-700' },

@@ -26,7 +26,7 @@ interface GameContextType {
 const defaultState: GameState = {
   playerId: '',
   playerName: 'Producer',
-  currentLevel: 1,
+  currentLevel: 6,
   currentCity: null,
   completedCities: [],
   clout: 0,
@@ -43,7 +43,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return {
+          ...defaultState,
+          ...parsed,
+          currentLevel: Math.max(parsed.currentLevel ?? 1, 6),
+        };
       } catch (e) {
         console.error("Failed to parse save", e);
       }
