@@ -1,0 +1,432 @@
+import React, { useState } from 'react';
+
+// BEATWORLD Strict Color Palette
+const COLORS = {
+  magenta: '#ff00ff',
+  cyan: '#00ffff',
+  yellow: '#ffff00',
+  electricBlue: '#0050ff',
+  red: '#ff0000',
+  green: '#00ff00',
+  hotPink: '#ff00c8',
+  orange: '#ff8800',
+  navy: '#0a0a1a',
+  midNavy: '#111133',
+  white: '#e0e0ff',
+  gray: '#444466',
+  black: '#000000',
+};
+
+const SKIN_TONES = ['#ffe0bd', '#f1c27d', '#c68642', '#8d5524', '#3d1c02'];
+const HAIR_COLORS = [
+  '#000000', '#444466', '#e0e0ff', '#ffff00', 
+  '#ff8800', '#ff0000', '#ff00c8', '#ff00ff', 
+  '#00ffff', '#0050ff', '#00ff00', '#3d1c02'
+];
+const PALETTE_COLORS = [
+  '#ff00ff', '#00ffff', '#ffff00', '#0050ff',
+  '#ff0000', '#00ff00', '#ff00c8', '#ff8800',
+  '#e0e0ff', '#444466', '#0a0a1a', '#ffffff'
+];
+
+const HAIR_STYLES = ['FADE', 'DREADS', 'SPIKES', 'BUZZ', 'MOP', 'PONYTAIL', 'AFRO', 'BALD'];
+const TOP_STYLES = ['TEE', 'HOODIE', 'JACKET', 'TANK', 'JERSEY', 'SUIT'];
+const PANTS_STYLES = ['JEANS', 'CARGOS', 'SHORTS', 'TRACK', 'SWEATS', 'SLACKS'];
+const ACCESSORIES = ['NONE', 'HEADPHONES 🎧', 'SNAPBACK 🧢', 'SUNGLASSES 🕶️', 'GOLD CHAIN ⛓️', 'BANDANA 🩹', 'MASK 😷'];
+
+export default function CharacterCreator() {
+  const [name, setName] = useState('');
+  const [skinTone, setSkinTone] = useState(SKIN_TONES[1]);
+  const [hairStyle, setHairStyle] = useState(HAIR_STYLES[0]);
+  const [hairColor, setHairColor] = useState(HAIR_COLORS[0]);
+  const [topStyle, setTopStyle] = useState(TOP_STYLES[0]);
+  const [topColor, setTopColor] = useState(PALETTE_COLORS[0]);
+  const [pantsStyle, setPantsStyle] = useState(PANTS_STYLES[0]);
+  const [pantsColor, setPantsColor] = useState(PALETTE_COLORS[9]);
+  const [accessory, setAccessory] = useState(ACCESSORIES[0]);
+
+  // SVG Render Helpers based on style selections
+  const renderHair = () => {
+    if (hairStyle === 'BALD') return null;
+    if (hairStyle === 'SPIKES') {
+      return (
+        <>
+          <rect x="6" y="2" width="12" height="2" fill={hairColor} />
+          <rect x="6" y="0" width="2" height="2" fill={hairColor} />
+          <rect x="10" y="0" width="2" height="2" fill={hairColor} />
+          <rect x="14" y="0" width="2" height="2" fill={hairColor} />
+        </>
+      );
+    }
+    if (hairStyle === 'AFRO') {
+      return <rect x="4" y="0" width="16" height="6" fill={hairColor} />;
+    }
+    // Default FADE / BUZZ / etc fallback shape
+    return <rect x="6" y="1" width="12" height="3" fill={hairColor} />;
+  };
+
+  const renderTop = () => {
+    // Base Torso
+    const torso = <rect x="5" y="12" width="14" height="16" fill={topColor} />;
+    // Arms (y:13-25) - width 2, at x:3 and x:19
+    const arms = (
+      <>
+        {/* Sleeves */}
+        <rect x="3" y="13" width="2" height={topStyle === 'TANK' ? 2 : topStyle === 'HOODIE' ? 10 : 5} fill={topColor} />
+        <rect x="19" y="13" width="2" height={topStyle === 'TANK' ? 2 : topStyle === 'HOODIE' ? 10 : 5} fill={topColor} />
+        {/* Skin below sleeves */}
+        {topStyle !== 'HOODIE' && (
+          <>
+            <rect x="3" y={topStyle === 'TANK' ? 15 : 18} width="2" height={topStyle === 'TANK' ? 10 : 7} fill={skinTone} />
+            <rect x="19" y={topStyle === 'TANK' ? 15 : 18} width="2" height={topStyle === 'TANK' ? 10 : 7} fill={skinTone} />
+          </>
+        )}
+      </>
+    );
+
+    // Style details
+    let details = null;
+    if (topStyle === 'HOODIE') {
+      details = <rect x="6" y="12" width="12" height="4" fill={topColor} opacity="0.8" />; // Hood collar
+    } else if (topStyle === 'JACKET') {
+      details = <rect x="11" y="12" width="2" height="16" fill="#0a0a1a" opacity="0.5" />; // Zipper
+    }
+
+    return <>{torso}{arms}{details}</>;
+  };
+
+  const renderPants = () => {
+    const isShorts = pantsStyle === 'SHORTS';
+    return (
+      <>
+        {/* Waist/Hips */}
+        <rect x="5" y="28" width="14" height="4" fill={pantsColor} />
+        {/* Legs split */}
+        <rect x="5" y="32" width="6" height={isShorts ? 4 : 8} fill={pantsColor} />
+        <rect x="13" y="32" width="6" height={isShorts ? 4 : 8} fill={pantsColor} />
+        {/* Skin if shorts */}
+        {isShorts && (
+          <>
+            <rect x="5" y="36" width="6" height="4" fill={skinTone} />
+            <rect x="13" y="36" width="6" height="4" fill={skinTone} />
+          </>
+        )}
+      </>
+    );
+  };
+
+  const renderAccessory = () => {
+    if (accessory.includes('HEADPHONES')) {
+      return (
+        <>
+          <rect x="4" y="5" width="2" height="4" fill="#aaaaaa" />
+          <rect x="18" y="5" width="2" height="4" fill="#aaaaaa" />
+          <rect x="4" y="3" width="16" height="2" fill="#aaaaaa" />
+        </>
+      );
+    }
+    if (accessory.includes('SNAPBACK')) {
+      return (
+        <>
+          <rect x="5" y="1" width="14" height="3" fill={topColor} />
+          <rect x="15" y="3" width="6" height="1" fill={topColor} />
+        </>
+      );
+    }
+    if (accessory.includes('SUNGLASSES')) {
+      return <rect x="7" y="7" width="10" height="2" fill="#000088" />;
+    }
+    if (accessory.includes('GOLD CHAIN')) {
+      return (
+        <>
+          <rect x="8" y="12" width="2" height="2" fill={COLORS.yellow} />
+          <rect x="14" y="12" width="2" height="2" fill={COLORS.yellow} />
+          <rect x="10" y="14" width="4" height="2" fill={COLORS.yellow} />
+        </>
+      );
+    }
+    if (accessory.includes('BANDANA')) {
+      return <rect x="6" y="10" width="12" height="3" fill={COLORS.hotPink} />;
+    }
+    if (accessory.includes('MASK')) {
+      return (
+        <>
+          <rect x="7" y="10" width="10" height="3" fill="#ffffff" />
+          <rect x="5" y="10" width="2" height="1" fill="#aaaaaa" />
+          <rect x="17" y="10" width="2" height="1" fill="#aaaaaa" />
+        </>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-[#0a0a1a] text-[#e0e0ff] uppercase overflow-hidden font-press-start flex flex-col md:flex-row relative">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        .font-press-start {
+          font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Overlays */
+        .scanlines {
+          background: repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 0px,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.12) 2px,
+            rgba(0, 0, 0, 0.12) 4px
+          );
+          pointer-events: none;
+        }
+
+        .grid-overlay {
+          background-image: 
+            linear-gradient(rgba(255, 0, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 255, 0.03) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        .pixel-shadow { box-shadow: 4px 4px 0px #000; }
+        .pixel-shadow-sm { box-shadow: 2px 2px 0px #000; }
+        .pixel-shadow-glow { box-shadow: 0 0 20px #ff00ff40; }
+
+        /* Custom Scrollbar for Right Panel */
+        .custom-scroll::-webkit-scrollbar { width: 12px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #0a0a1a; border-left: 2px solid #444466; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #00ffff; border: 2px solid #000; }
+        
+        /* Blinking Cursor */
+        .blinking-cursor {
+          caret-color: transparent;
+        }
+        .blinking-cursor:focus {
+          animation: caretBlink 1s steps(2, start) infinite;
+          caret-color: #00ffff;
+        }
+        @keyframes caretBlink {
+          0%, 100% { caret-color: transparent; }
+          50% { caret-color: #00ffff; }
+        }
+      `}</style>
+
+      {/* Global Overlays */}
+      <div className="absolute inset-0 grid-overlay z-0" />
+      <div className="absolute inset-0 scanlines z-10" />
+
+      {/* Back Button */}
+      <button className="absolute top-4 left-4 z-50 text-[#00ffff] text-[8px] uppercase hover:text-[#ffffff] focus:outline-none">
+        ← BACK
+      </button>
+
+      {/* LEFT PANEL */}
+      <div className="relative z-20 w-full md:w-1/2 bg-[#111133] border-b-2 md:border-b-0 md:border-r-2 border-[#ff00ff] p-[32px] flex flex-col pt-16 md:pt-[32px] md:h-screen justify-center">
+        <h2 className="text-[#00ffff] text-[9px] mb-[24px] uppercase" style={{ textShadow: '0 0 8px #00ffff' }}>
+          YOUR PRODUCER
+        </h2>
+
+        {/* Sprite Preview */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-[120px] h-[240px] bg-[#0a0a1a] border-2 border-[#ff00ff] pixel-shadow-glow flex items-center justify-center relative">
+            <svg
+              viewBox="0 0 24 48"
+              width="96"
+              height="192"
+              style={{ imageRendering: 'pixelated' }}
+            >
+              {/* Back Hair (if applicable) */}
+              {(hairStyle === 'PONYTAIL' || hairStyle === 'DREADS') && (
+                <rect x="4" y="2" width="16" height="12" fill={hairColor} />
+              )}
+              
+              {/* Body Anatomy */}
+              {/* Head (y:4-12) */}
+              <rect x="6" y="4" width="12" height="8" fill={skinTone} />
+              
+              {/* Eyes (y:7) */}
+              <rect x="8" y="7" width="1" height="1" fill="#000" />
+              <rect x="14" y="7" width="1" height="1" fill="#000" />
+
+              {/* Hair (y:0-4ish) */}
+              {!accessory.includes('SNAPBACK') && renderHair()}
+
+              {/* Top/Torso + Arms (y:12-28) */}
+              {renderTop()}
+
+              {/* Pants + Legs (y:28-40) */}
+              {renderPants()}
+
+              {/* Shoes (y:40-48) */}
+              <rect x="5" y="40" width="4" height="8" fill="#222244" />
+              <rect x="15" y="40" width="4" height="8" fill="#222244" />
+
+              {/* Accessory Overlays */}
+              {renderAccessory()}
+            </svg>
+          </div>
+          {/* Platform Shadow */}
+          <div className="w-[140px] h-[20px] bg-[#ff00ff] opacity-20 mt-4 rounded-full blur-[4px]" style={{ borderRadius: '50%' }} />
+        </div>
+
+        {/* Name Input */}
+        <div className="w-full flex flex-col gap-2">
+          <label className="text-[#ffff00] text-[8px] uppercase" style={{ textShadow: '0 0 4px #ffff00' }}>
+            PRODUCER NAME
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.toUpperCase())}
+            maxLength={12}
+            className="bg-[#0a0a1a] border-2 border-[#00ffff] text-[#00ffff] text-[10px] p-[12px] w-full uppercase blinking-cursor focus:outline-none focus:shadow-[0_0_12px_#00ffff]"
+            placeholder="ENTER NAME"
+          />
+        </div>
+
+        {/* Enter Button */}
+        <button className="w-full mt-[24px] bg-[#ff00ff] text-[#0a0a1a] border-2 border-[#ff00ff] text-[10px] p-[16px] uppercase pixel-shadow hover:brightness-110 active:translate-y-[2px] active:translate-x-[2px] active:shadow-[2px_2px_0_#000] transition-none focus:outline-none focus:ring-2 focus:ring-[#ffff00]">
+          ENTER BEATWORLD
+        </button>
+      </div>
+
+      {/* RIGHT PANEL */}
+      <div className="relative z-20 w-full md:w-1/2 bg-[#0a0a1a] p-[24px] md:h-screen overflow-y-auto custom-scroll flex flex-col gap-8 pb-16">
+        
+        {/* Helper component for section headers */}
+        {const SectionHeader = ({ title }: { title: string }) => (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-[6px] h-[6px] bg-[#ffffff] shadow-[0_0_4px_#fff]" />
+            <span className="text-[#ffffff] text-[8px] uppercase tracking-wider">{title}</span>
+          </div>
+        )}
+
+        {/* SKIN TONE */}
+        <section>
+          <SectionHeader title="SKIN TONE" />
+          <div className="flex flex-wrap gap-3">
+            {SKIN_TONES.map(color => (
+              <button
+                key={color}
+                onClick={() => setSkinTone(color)}
+                className={`w-[32px] h-[32px] border-2 focus:outline-none ${skinTone === color ? 'border-[#ffff00] shadow-[inset_0_0_8px_#ffff00]' : 'border-[#444466]'}`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* HAIR STYLE */}
+        <section>
+          <SectionHeader title="HAIR STYLE" />
+          <div className="grid grid-cols-2 gap-2">
+            {HAIR_STYLES.map(style => (
+              <button
+                key={style}
+                onClick={() => setHairStyle(style)}
+                className={`text-[7px] uppercase py-3 border focus:outline-none transition-none ${hairStyle === style ? 'bg-[#2a0a2a] border-[#ff00ff] text-[#ff00ff] pixel-shadow-sm' : 'bg-[#111133] border-[#444466] text-[#e0e0ff]'}`}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* HAIR COLOR */}
+        <section>
+          <SectionHeader title="HAIR COLOR" />
+          <div className="flex flex-wrap gap-2">
+            {HAIR_COLORS.map(color => (
+              <button
+                key={color}
+                onClick={() => setHairColor(color)}
+                className={`w-[24px] h-[24px] border-2 focus:outline-none ${hairColor === color ? 'border-[#ffffff] shadow-[0_0_4px_#ffffff]' : 'border-[#444466]'}`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* TOP STYLE */}
+        <section>
+          <SectionHeader title="TOP STYLE" />
+          <div className="grid grid-cols-2 gap-2">
+            {TOP_STYLES.map(style => (
+              <button
+                key={style}
+                onClick={() => setTopStyle(style)}
+                className={`text-[7px] uppercase py-3 border focus:outline-none transition-none ${topStyle === style ? 'bg-[#2a0a2a] border-[#ff00ff] text-[#ff00ff] pixel-shadow-sm' : 'bg-[#111133] border-[#444466] text-[#e0e0ff]'}`}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* TOP COLOR */}
+        <section>
+          <SectionHeader title="TOP COLOR" />
+          <div className="flex flex-wrap gap-2">
+            {PALETTE_COLORS.map(color => (
+              <button
+                key={color}
+                onClick={() => setTopColor(color)}
+                className={`w-[24px] h-[24px] border-2 focus:outline-none ${topColor === color ? 'border-[#ffffff] shadow-[0_0_4px_#ffffff]' : 'border-[#444466]'}`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* PANTS STYLE */}
+        <section>
+          <SectionHeader title="PANTS STYLE" />
+          <div className="grid grid-cols-2 gap-2">
+            {PANTS_STYLES.map(style => (
+              <button
+                key={style}
+                onClick={() => setPantsStyle(style)}
+                className={`text-[7px] uppercase py-3 border focus:outline-none transition-none ${pantsStyle === style ? 'bg-[#2a0a2a] border-[#ff00ff] text-[#ff00ff] pixel-shadow-sm' : 'bg-[#111133] border-[#444466] text-[#e0e0ff]'}`}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* PANTS COLOR */}
+        <section>
+          <SectionHeader title="PANTS COLOR" />
+          <div className="flex flex-wrap gap-2">
+            {PALETTE_COLORS.slice(0, 10).map(color => (
+              <button
+                key={color}
+                onClick={() => setPantsColor(color)}
+                className={`w-[24px] h-[24px] border-2 focus:outline-none ${pantsColor === color ? 'border-[#ffffff] shadow-[0_0_4px_#ffffff]' : 'border-[#444466]'}`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* ACCESSORY */}
+        <section>
+          <SectionHeader title="ACCESSORY" />
+          <div className="flex flex-wrap gap-2">
+            {ACCESSORIES.map(acc => (
+              <button
+                key={acc}
+                onClick={() => setAccessory(acc)}
+                className={`text-[7px] uppercase py-3 px-4 border focus:outline-none transition-none ${accessory === acc ? 'bg-[#2a0a2a] border-[#ff00ff] text-[#ff00ff] pixel-shadow-sm' : 'bg-[#111133] border-[#444466] text-[#e0e0ff]'}`}
+              >
+                {acc}
+              </button>
+            ))}
+          </div>
+        </section>
+
+      </div>
+    </div>
+  );
+}
