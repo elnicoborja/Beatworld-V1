@@ -1,46 +1,48 @@
-import { useState, useMemo } from 'react';
-import { CITIES, CITIES_LIST, type CityLevel } from '@/lib/game-data';
+import { useState, useMemo, useCallback } from 'react';
+import { CITIES_LIST, type CityLevel } from '@/lib/game-data';
 import { useLocation } from 'wouter';
 import { useGameState } from '@/hooks/use-game-state';
 
 const C = {
-  skyBlue: '#87ceeb', oceanTeal: '#4499aa', oceanDark: '#4488bb', cream: '#fff8e7',
-  hotPink: '#ff3399', yellow: '#ffee00', cobalt: '#0050cc', lime: '#44cc00',
-  orange: '#ff8800', teal: '#00aaaa', purple: '#6600cc', black: '#111111', gray: '#888899',
-  lowland: '#44aa44', highland: '#aa8844', desert: '#ddbb66', snow: '#eeeeff', coast: '#d4c090',
+  skyBlue: '#87ceeb', cream: '#fff8e7', hotPink: '#ff3399', magenta: '#cc0066',
+  yellow: '#ffee00', cobalt: '#0050cc', lime: '#44cc00', orange: '#ff8800',
+  teal: '#00aaaa', purple: '#6600cc', black: '#111111', white: '#ffffff',
+  grass1: '#66bb44', grass2: '#55aa33', grass3: '#449922', sand: '#ddcc88',
+  water: '#4499bb', waterDark: '#337799', pathColor: '#eeddaa', pathDot: '#ccaa66',
+  rockGray: '#99887a', rockDark: '#776655',
 };
 
-const LEVEL_META: Record<number, { color: string; name: string }> = {
-  1: { color: C.hotPink, name: 'L1 HIP HOP' },
-  2: { color: C.orange, name: 'L2 REGGAETON' },
-  3: { color: C.yellow, name: 'L3 BAILE FUNK' },
-  4: { color: C.lime, name: 'L4 CUMBIA / TRAP' },
-  5: { color: C.teal, name: 'L5 CORRIDOS / ELEC' },
-  6: { color: C.purple, name: 'L6 TECHNO / HOUSE' },
+const LEVEL_META: Record<number, { color: string; name: string; bg: string }> = {
+  1: { color: C.hotPink, name: 'L1 HIP HOP', bg: C.grass1 },
+  2: { color: C.orange, name: 'L2 REGGAETON', bg: '#cc9944' },
+  3: { color: C.yellow, name: 'L3 BAILE FUNK', bg: '#44aa66' },
+  4: { color: C.lime, name: 'L4 CUMBIA / TRAP', bg: '#88aa44' },
+  5: { color: C.teal, name: 'L5 CORRIDOS / ELEC', bg: '#aa8855' },
+  6: { color: C.purple, name: 'L6 TECHNO / HOUSE', bg: '#888899' },
 };
 
-const CITY_POSITIONS: Record<string, { x: number; y: number }> = {
-  'new-york': { x: 22, y: 28 }, 'los-angeles': { x: 12, y: 28 },
-  'puerto-rico': { x: 28, y: 35 }, 'dominican-republic': { x: 27, y: 36 },
-  'medellin': { x: 23, y: 44 }, 'rio': { x: 30, y: 60 },
-  'fortaleza': { x: 33, y: 55 }, 'sao-paulo': { x: 28, y: 62 },
-  'bogota': { x: 22, y: 45 }, 'buenos-aires': { x: 25, y: 70 },
-  'santiago': { x: 21, y: 70 }, 'mexico-city': { x: 16, y: 33 },
-  'monterrey': { x: 16, y: 30 }, 'tulum': { x: 19, y: 34 },
-  'berlin': { x: 50, y: 22 }, 'london': { x: 46, y: 22 },
-  'newcastle': { x: 46, y: 20 }, 'brighton': { x: 46, y: 23 },
+const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
+  'new-york': { x: 280, y: 180 }, 'los-angeles': { x: 120, y: 220 },
+  'puerto-rico': { x: 380, y: 320 }, 'dominican-republic': { x: 460, y: 350 },
+  'medellin': { x: 340, y: 420 },
+  'rio': { x: 420, y: 580 }, 'fortaleza': { x: 500, y: 520 }, 'sao-paulo': { x: 360, y: 620 },
+  'bogota': { x: 260, y: 460 }, 'buenos-aires': { x: 320, y: 720 }, 'santiago': { x: 220, y: 700 },
+  'mexico-city': { x: 160, y: 340 }, 'monterrey': { x: 140, y: 280 }, 'tulum': { x: 240, y: 360 },
+  'berlin': { x: 700, y: 160 }, 'london': { x: 620, y: 140 }, 'newcastle': { x: 640, y: 100 }, 'brighton': { x: 660, y: 180 },
 };
 
-const CITY_SHORTS: Record<string, string> = {
-  'new-york': 'NYC', 'los-angeles': 'LAX', 'puerto-rico': 'SJU', 'dominican-republic': 'SDQ',
-  'medellin': 'MDE', 'rio': 'GIG', 'fortaleza': 'FOR', 'sao-paulo': 'GRU',
-  'bogota': 'BOG', 'buenos-aires': 'EZE', 'santiago': 'SCL', 'mexico-city': 'MEX',
-  'monterrey': 'MTY', 'tulum': 'TQO', 'berlin': 'BER', 'london': 'LHR',
-  'newcastle': 'NCL', 'brighton': 'BSH',
-};
+const PATH_CONNECTIONS: [string, string][] = [
+  ['new-york', 'los-angeles'], ['new-york', 'puerto-rico'], ['los-angeles', 'monterrey'],
+  ['puerto-rico', 'dominican-republic'], ['puerto-rico', 'medellin'], ['dominican-republic', 'medellin'],
+  ['medellin', 'bogota'], ['medellin', 'rio'],
+  ['rio', 'fortaleza'], ['rio', 'sao-paulo'], ['sao-paulo', 'buenos-aires'], ['buenos-aires', 'santiago'],
+  ['bogota', 'mexico-city'], ['mexico-city', 'monterrey'], ['mexico-city', 'tulum'],
+  ['tulum', 'london'],
+  ['london', 'berlin'], ['london', 'newcastle'], ['london', 'brighton'], ['berlin', 'brighton'],
+];
 
 function shade(col: string, amt: number) {
-  let c = col.startsWith('#') ? col.slice(1) : col;
+  const c = col.startsWith('#') ? col.slice(1) : col;
   const num = parseInt(c, 16);
   const r = Math.min(255, Math.max(0, (num >> 16) + amt));
   const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt));
@@ -56,203 +58,272 @@ function IsoBlock({ x, y, w, h, d, color }: { x: number; y: number; w: number; h
       <polygon points={`0,0 ${w},${-w * 0.5} ${w + d},${-w * 0.5 + d * 0.5} ${d},${d * 0.5}`} fill={top} />
       <polygon points={`0,0 ${d},${d * 0.5} ${d},${d * 0.5 + h} 0,${h}`} fill={color} />
       <polygon points={`${d},${d * 0.5} ${w + d},${-w * 0.5 + d * 0.5} ${w + d},${-w * 0.5 + d * 0.5 + h} ${d},${d * 0.5 + h}`} fill={right} />
-      <polygon points={`0,0 ${w},${-w * 0.5} ${w + d},${-w * 0.5 + d * 0.5} ${d},${d * 0.5}`} fill="none" stroke={C.black} strokeWidth="0.5" />
-      <polygon points={`0,0 ${d},${d * 0.5} ${d},${d * 0.5 + h} 0,${h}`} fill="none" stroke={C.black} strokeWidth="0.5" />
-      <polygon points={`${d},${d * 0.5} ${w + d},${-w * 0.5 + d * 0.5} ${w + d},${-w * 0.5 + d * 0.5 + h} ${d},${d * 0.5 + h}`} fill="none" stroke={C.black} strokeWidth="0.5" />
+      <polygon points={`0,0 ${w},${-w * 0.5} ${w + d},${-w * 0.5 + d * 0.5} ${d},${d * 0.5}`} fill="none" stroke={C.black} strokeWidth="0.5" opacity="0.3" />
+      <polygon points={`0,0 ${d},${d * 0.5} ${d},${d * 0.5 + h} 0,${h}`} fill="none" stroke={C.black} strokeWidth="0.5" opacity="0.3" />
+      <polygon points={`${d},${d * 0.5} ${w + d},${-w * 0.5 + d * 0.5} ${w + d},${-w * 0.5 + d * 0.5 + h} ${d},${d * 0.5 + h}`} fill="none" stroke={C.black} strokeWidth="0.5" opacity="0.3" />
     </g>
   );
 }
 
-function CityPin({ city, isUnlocked, isCurrent, levelColor, onClick }: {
-  city: CityLevel; isUnlocked: boolean; isCurrent: boolean; levelColor: string; onClick: () => void;
+function CityNode({ city, levelColor, isUnlocked, isCurrent, isCompleted, isHovered, onHover, onClick }: {
+  city: CityLevel; levelColor: string; isUnlocked: boolean; isCurrent: boolean; isCompleted: boolean;
+  isHovered: boolean; onHover: (id: string | null) => void; onClick: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const pos = CITY_POSITIONS[city.id] || { x: 50, y: 50 };
+  const pos = NODE_POSITIONS[city.id] || { x: 400, y: 400 };
   const isLocked = !isUnlocked && !isCurrent;
-  const short = CITY_SHORTS[city.id] || city.id.slice(0, 3).toUpperCase();
 
   return (
-    <div
-      className={`absolute ${isLocked ? 'pointer-events-none' : 'cursor-pointer'} ${isCurrent ? 'z-40' : 'z-20'}`}
-      style={{
-        top: `${pos.y}%`, left: `${pos.x}%`,
-        filter: isLocked ? 'saturate(0) brightness(0.4)' : undefined,
-        transform: isCurrent ? 'scale(1.4)' : undefined,
-      }}
-      onMouseEnter={() => !isLocked && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <g
+      transform={`translate(${pos.x}, ${pos.y})`}
+      style={{ cursor: isLocked ? 'default' : 'pointer', opacity: isLocked ? 0.35 : 1 }}
+      onMouseEnter={() => !isLocked && onHover(city.id)}
+      onMouseLeave={() => onHover(null)}
       onClick={() => !isLocked && onClick()}
     >
-      <div className="relative -translate-x-1/2 -translate-y-full flex flex-col items-center">
-        <svg width="32" height="32" viewBox="0 0 32 32" className="overflow-visible" style={{ imageRendering: 'pixelated' }}>
-          <IsoBlock x={12} y={18} w={8} d={8} h={8} color={levelColor} />
-          <IsoBlock x={4} y={22} w={8} d={8} h={6} color={levelColor} />
-          <IsoBlock x={18} y={14} w={8} d={8} h={12} color={levelColor} />
-        </svg>
+      {isCurrent && (
+        <circle cx="0" cy="0" r="22" fill="none" stroke={C.white} strokeWidth="2" strokeDasharray="4 3" opacity="0.8">
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite" />
+        </circle>
+      )}
 
-        <div
-          className="absolute w-[4px] h-[4px] top-[4px] right-[8px] border border-[#111]"
-          style={{
-            animation: isCurrent ? 'beaconBlink 0.4s steps(2, start) infinite' : 'beaconBlink 1s steps(2, start) infinite',
-            '--level-color': levelColor,
-          } as React.CSSProperties}
-        />
+      <IsoBlock x={-12} y={-8} w={8} d={8} h={isCompleted ? 6 : 10} color={levelColor} />
+      <IsoBlock x={-4} y={-12} w={8} d={8} h={isCompleted ? 10 : 16} color={shade(levelColor, -15)} />
+      <IsoBlock x={4} y={-6} w={6} d={6} h={isCompleted ? 4 : 8} color={shade(levelColor, 15)} />
 
-        <div className="mt-[-4px] px-1 py-[2px] border border-[#111111]" style={{ backgroundColor: levelColor, boxShadow: '1px 1px 0 #111' }}>
-          <span className="text-[6px] text-[#111] whitespace-nowrap">{short}</span>
-        </div>
+      {isCompleted && (
+        <g transform="translate(-2, -22)">
+          <rect x="0" y="0" width="5" height="8" fill={C.white} stroke={C.black} strokeWidth="0.5" />
+          <polygon points="5,0 12,4 5,4" fill={levelColor} stroke={C.black} strokeWidth="0.5" />
+        </g>
+      )}
 
-        {hovered && !isLocked && (
-          <div className="absolute bottom-full mb-2 bg-[#fff8e7] border-2 border-[#111] p-2 whitespace-nowrap flex flex-col gap-[6px] z-50" style={{ boxShadow: '3px 3px 0 #111' }}>
-            <div className="text-[7px] text-[#111]">{city.emoji} {city.name.toUpperCase()}</div>
-            <div className="text-[7px] text-[#0050cc]">{city.genre.toUpperCase()}</div>
-            <div className="text-[7px] text-[#888899]">L{city.level} · {city.defaultBpm || 120} BPM</div>
-            <div className="text-[7px] text-[#44cc00] mt-1">✓ ENTER STUDIO</div>
-          </div>
-        )}
-      </div>
-    </div>
+      {isCurrent && (
+        <g transform="translate(-3, -28)">
+          <polygon points="3,0 6,6 0,6" fill={C.yellow} stroke={C.black} strokeWidth="0.5">
+            <animate attributeName="opacity" values="1;0.4;1" dur="0.6s" repeatCount="indefinite" />
+          </polygon>
+        </g>
+      )}
+
+      <text x="0" y="20" textAnchor="middle" fontSize="6" fontFamily="'Press Start 2P', monospace" fill={isLocked ? '#666' : C.white} stroke={C.black} strokeWidth="2" paintOrder="stroke" strokeLinejoin="round">
+        {city.name.toUpperCase().slice(0, 12)}
+      </text>
+      <text x="0" y="28" textAnchor="middle" fontSize="5" fontFamily="'Press Start 2P', monospace" fill={isLocked ? '#555' : levelColor} stroke={C.black} strokeWidth="1.5" paintOrder="stroke" strokeLinejoin="round">
+        {city.genre.toUpperCase()}
+      </text>
+
+      {isHovered && !isLocked && (
+        <g transform="translate(20, -40)">
+          <rect x="0" y="0" width="110" height="50" fill={C.cream} stroke={C.black} strokeWidth="2" />
+          <rect x="0" y="0" width="110" height="12" fill={levelColor} stroke={C.black} strokeWidth="2" />
+          <text x="6" y="9" fontSize="5" fontFamily="'Press Start 2P', monospace" fill={C.black}>{city.emoji} {city.name.toUpperCase()}</text>
+          <text x="6" y="24" fontSize="4.5" fontFamily="'Press Start 2P', monospace" fill={C.cobalt}>{city.genre.toUpperCase()}</text>
+          <text x="6" y="34" fontSize="4" fontFamily="'Press Start 2P', monospace" fill={C.black}>L{city.level} · {city.defaultBpm || 120} BPM</text>
+          <text x="6" y="44" fontSize="4" fontFamily="'Press Start 2P', monospace" fill={C.lime}>▶ ENTER STUDIO</text>
+        </g>
+      )}
+    </g>
   );
 }
 
 export function WorldMap() {
   const [, setLocation] = useLocation();
   const { state } = useGameState();
+  const [hoveredCity, setHoveredCity] = useState<string | null>(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [didDrag, setDidDrag] = useState(false);
 
-  const waves = useMemo(() =>
-    Array.from({ length: 200 }).map(() => ({ x: Math.random() * 100, y: Math.random() * 100 })), []);
+  const isoTiles = useMemo(() => {
+    const tiles: { x: number; y: number; color: string }[] = [];
+    const tW = 32, tH = 16;
+    for (let row = 0; row < 60; row++) {
+      for (let col = 0; col < 35; col++) {
+        const px = (col - row) * tW * 0.5 + 450;
+        const py = (col + row) * tH * 0.5 - 100;
+        const noise = Math.sin(col * 0.7) * Math.cos(row * 0.5);
+        let color = C.grass1;
+        if (noise > 0.5) color = C.grass2;
+        else if (noise > 0.2) color = C.grass3;
+        else if (noise < -0.6) color = C.water;
+        else if (noise < -0.3) color = C.sand;
+        tiles.push({ x: px, y: py, color });
+      }
+    }
+    return tiles;
+  }, []);
 
-  const handleCityClick = (city: CityLevel) => {
-    setLocation(`/studio/${city.id}`);
-  };
+  const treeClusters = useMemo(() => {
+    const trees: { x: number; y: number; h: number; color: string }[] = [];
+    for (let i = 0; i < 40; i++) {
+      const tx = 50 + Math.random() * 750;
+      const ty = 50 + Math.random() * 750;
+      let blocked = false;
+      for (const pos of Object.values(NODE_POSITIONS)) {
+        if (Math.abs(tx - pos.x) < 40 && Math.abs(ty - pos.y) < 40) { blocked = true; break; }
+      }
+      if (!blocked) {
+        const g = ['#338833', '#44aa33', '#228822', '#55cc44'][Math.floor(Math.random() * 4)];
+        trees.push({ x: tx, y: ty, h: 4 + Math.random() * 6, color: g });
+      }
+    }
+    return trees;
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setDragging(true);
+    setDidDrag(false);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  }, [pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (dragging) {
+      const dx = e.clientX - dragStart.x - pan.x;
+      const dy = e.clientY - dragStart.y - pan.y;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) setDidDrag(true);
+      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+    }
+  }, [dragging, dragStart, pan]);
+
+  const handleMouseUp = useCallback(() => setDragging(false), []);
 
   return (
     <div
-      className="relative w-screen h-screen select-none overflow-hidden uppercase text-[#111111]"
-      style={{ background: `linear-gradient(to bottom, ${C.skyBlue} 50%, ${C.oceanTeal} 50%)`, fontFamily: "'Press Start 2P', monospace" }}
+      className="relative w-screen h-screen select-none overflow-hidden uppercase"
+      style={{ backgroundColor: '#3388aa', fontFamily: "'Press Start 2P', monospace", cursor: dragging ? 'grabbing' : 'grab' }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
-      <style>{`
-        @keyframes beaconBlink { 0%,100%{background-color:#ffffff} 50%{background-color:var(--level-color)} }
-      `}</style>
+      <svg
+        width="100%" height="100%"
+        viewBox={`${-pan.x * 0.8 - 50} ${-pan.y * 0.8 - 50} 900 850`}
+        style={{ imageRendering: 'pixelated' }}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <defs>
+          <filter id="map-shadow">
+            <feDropShadow dx="2" dy="2" stdDeviation="1" floodColor="#000" floodOpacity="0.3" />
+          </filter>
+        </defs>
 
-      <svg className="hidden">
-        <filter id="grain-wm">
-          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
-        </filter>
-      </svg>
-      <div className="absolute inset-0 pointer-events-none z-10 opacity-[0.08]" style={{ filter: 'url(#grain-wm)', mixBlendMode: 'multiply' }} />
-
-      {/* SVG MAP BACKGROUND */}
-      <div className="absolute inset-0 z-0" style={{ backgroundColor: C.oceanDark }}>
-        <svg width="100%" height="100%" preserveAspectRatio="none" style={{ imageRendering: 'pixelated' }}>
-          {waves.map((w, i) => (
-            <rect key={i} x={`${w.x}%`} y={`${w.y}%`} width="2" height="1" fill="#ffffff" opacity="0.6" />
-          ))}
-
-          {/* NORTH AMERICA */}
-          <g transform="translate(100, 150) scale(1.5)">
-            <rect x="0" y="0" width="120" height="90" fill={C.coast} />
-            <rect x="5" y="-5" width="110" height="80" fill={C.lowland} />
-            <rect x="15" y="-15" width="80" height="40" fill={C.highland} />
-            <rect x="10" y="20" width="40" height="30" fill={C.desert} />
-            <rect x="25" y="-20" width="50" height="15" fill={C.snow} />
-            <IsoBlock x={30} y={-10} w={8} d={8} h={20} color="#aaa" />
-            <IsoBlock x={70} y={40} w={6} d={6} h={15} color="#cc4444" />
-          </g>
-
-          {/* SOUTH AMERICA */}
-          <g transform="translate(250, 350) scale(1.5)">
-            <polygon points="0,0 80,0 60,120 20,120" fill={C.coast} />
-            <polygon points="5,-5 75,-5 55,110 25,110" fill={C.lowland} />
-            <polygon points="10,-10 30,-10 25,80 15,80" fill={C.highland} />
-            <IsoBlock x={40} y={20} w={10} d={10} h={12} color="#44aaee" />
-            <IsoBlock x={60} y={50} w={8} d={8} h={18} color="#ddaa22" />
-          </g>
-
-          {/* EUROPE & AFRICA */}
-          <g transform="translate(500, 100) scale(1.5)">
-            <rect x="0" y="0" width="140" height="160" fill={C.coast} />
-            <rect x="10" y="-10" width="120" height="150" fill={C.lowland} />
-            <rect x="10" y="60" width="120" height="70" fill={C.desert} />
-            <rect x="40" y="-20" width="60" height="20" fill={C.snow} />
-            <rect x="70" y="10" width="40" height="30" fill={C.highland} />
-            <IsoBlock x={30} y={20} w={6} d={6} h={25} color="#888" />
-            <IsoBlock x={80} y={80} w={12} d={12} h={8} color="#eecc66" />
-            <IsoBlock x={40} y={110} w={8} d={8} h={10} color="#55aa77" />
-          </g>
-        </svg>
-      </div>
-
-      {/* CITY PINS */}
-      <div className="absolute inset-0 z-20">
-        {CITIES_LIST.map((city) => {
-          const isUnlocked = city.level <= state.currentLevel;
-          const isCurrent = state.currentCity === city.id;
-          const levelColor = LEVEL_META[city.level]?.color || '#ffffff';
-
+        {isoTiles.map((tile, i) => {
+          const tW = 32, tH = 16;
           return (
-            <CityPin
-              key={city.id}
-              city={city}
-              isUnlocked={isUnlocked}
-              isCurrent={isCurrent}
-              levelColor={levelColor}
-              onClick={() => handleCityClick(city)}
+            <polygon
+              key={i}
+              points={`${tile.x},${tile.y} ${tile.x + tW * 0.5},${tile.y + tH * 0.5} ${tile.x},${tile.y + tH} ${tile.x - tW * 0.5},${tile.y + tH * 0.5}`}
+              fill={tile.color}
+              stroke={shade(tile.color, -15)}
+              strokeWidth="0.5"
             />
           );
         })}
+
+        {treeClusters.map((tree, i) => (
+          <g key={`tree-${i}`}>
+            <IsoBlock x={tree.x} y={tree.y} w={4} d={4} h={tree.h} color={tree.color} />
+          </g>
+        ))}
+
+        {PATH_CONNECTIONS.map(([from, to], i) => {
+          const a = NODE_POSITIONS[from];
+          const b = NODE_POSITIONS[to];
+          if (!a || !b) return null;
+          const fromCity = CITIES_LIST.find(c => c.id === from);
+          const toCity = CITIES_LIST.find(c => c.id === to);
+          const fromUnlocked = fromCity && fromCity.level <= state.currentLevel;
+          const toUnlocked = toCity && toCity.level <= state.currentLevel;
+          const pathActive = fromUnlocked || toUnlocked;
+
+          return (
+            <g key={`path-${i}`}>
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={C.black} strokeWidth="5" opacity="0.2" />
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke={pathActive ? C.pathColor : '#666'}
+                strokeWidth="3"
+                strokeDasharray="6 4"
+                opacity={pathActive ? 0.9 : 0.3}
+              />
+              {pathActive && Array.from({ length: 5 }).map((_, di) => {
+                const t = (di + 1) / 6;
+                const dx = a.x + (b.x - a.x) * t;
+                const dy = a.y + (b.y - a.y) * t;
+                return <circle key={di} cx={dx} cy={dy} r="2" fill={C.pathDot} stroke={C.black} strokeWidth="0.5" />;
+              })}
+            </g>
+          );
+        })}
+
+        {CITIES_LIST.map((city) => {
+          const isUnlocked = city.level <= state.currentLevel;
+          const isCurrent = state.currentCity === city.id;
+          const isCompleted = state.completedCities.includes(city.id);
+          const levelColor = LEVEL_META[city.level]?.color || '#fff';
+
+          return (
+            <CityNode
+              key={city.id}
+              city={city}
+              levelColor={levelColor}
+              isUnlocked={isUnlocked}
+              isCurrent={isCurrent}
+              isCompleted={isCompleted}
+              isHovered={hoveredCity === city.id}
+              onHover={setHoveredCity}
+              onClick={() => { if (!didDrag) setLocation(`/studio/${city.id}`); }}
+            />
+          );
+        })}
+      </svg>
+
+      {/* HUD: Title */}
+      <div className="absolute top-4 left-4 z-30 bg-[#fff8e7] border-[3px] border-[#111] p-3 px-4" style={{ boxShadow: '4px 4px 0 #111' }}>
+        <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#ccbbaa]" />
+        <div className="text-[#ff3399] text-[10px] ml-1" style={{ textShadow: '1px 1px 0 #111' }}>BEATWORLD</div>
+        <div className="text-[#0050cc] text-[6px] ml-1 mt-1">DRAG TO PAN · CLICK A CITY</div>
       </div>
 
-      {/* HUD: Title Panel */}
-      <div className="absolute top-6 left-6 z-30 bg-[#fff8e7] border-[3px] border-[#111] p-3 px-4 flex flex-col gap-2" style={{ boxShadow: '5px 5px 0 #111' }}>
-        <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-[#ccbbaa]" />
-        <div className="text-[#ff3399] text-[11px] ml-1" style={{ textShadow: '1px 1px 0 #111' }}>BEATWORLD MAP</div>
-        <div className="text-[#0050cc] text-[7px] ml-1">CLICK A CITY TO BEGIN</div>
-      </div>
-
-      {/* HUD: Stats Panel */}
-      <div className="absolute top-6 right-6 z-30 bg-[#fff8e7] border-[3px] border-[#111] flex flex-row" style={{ boxShadow: '5px 5px 0 #111' }}>
-        <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-[#ccbbaa]" />
-        <div className="p-3 px-4 flex flex-col gap-[6px] ml-1">
-          <div className="text-[#888899] text-[6px]">PRODUCER</div>
-          <div className="text-[#111111] text-[9px]">{state.playerName.toUpperCase()}</div>
+      {/* HUD: Stats */}
+      <div className="absolute top-4 right-4 z-30 bg-[#fff8e7] border-[3px] border-[#111] flex" style={{ boxShadow: '4px 4px 0 #111' }}>
+        <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#ccbbaa]" />
+        <div className="p-2 px-3 ml-1">
+          <div className="text-[#888] text-[5px]">PRODUCER</div>
+          <div className="text-[#111] text-[8px]">{state.playerName.toUpperCase()}</div>
         </div>
-        <div className="w-[2px] bg-[#111111] my-2" />
-        <div className="p-3 px-4 flex flex-col gap-[6px]">
-          <div className="text-[#888899] text-[6px]">CLOUT</div>
-          <div className="text-[#ff3399] text-[9px]" style={{ textShadow: '1px 1px 0 #111' }}>
-            {String(state.clout).padStart(6, '0')}
-          </div>
+        <div className="w-[2px] bg-[#111] my-1" />
+        <div className="p-2 px-3">
+          <div className="text-[#888] text-[5px]">CLOUT</div>
+          <div className="text-[#ff3399] text-[8px]" style={{ textShadow: '1px 1px 0 #111' }}>{String(state.clout).padStart(6, '0')}</div>
+        </div>
+        <div className="w-[2px] bg-[#111] my-1" />
+        <div className="p-2 px-3">
+          <div className="text-[#888] text-[5px]">CITIES</div>
+          <div className="text-[#44cc00] text-[8px]">{state.completedCities.length}/18</div>
         </div>
       </div>
 
       {/* HUD: Action Buttons */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex gap-4">
-        <button
-          className="bg-[#0050cc] text-white text-[9px] pl-4 pr-5 py-3 border-2 border-[#111] flex items-center relative overflow-hidden hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px]"
-          style={{ boxShadow: '4px 4px 0 #111' }}
-        >
-          <div className="absolute left-0 top-0 bottom-0 w-[6px] bg-[#003399]" />
-          <span className="relative z-10 ml-1">🎵 GRAMMCHAT</span>
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-3">
+        <button className="bg-[#0050cc] text-white text-[8px] px-4 py-2 border-2 border-[#111] relative overflow-hidden hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px]" style={{ boxShadow: '3px 3px 0 #111' }} onClick={(e) => e.stopPropagation()}>
+          <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#003399]" />
+          <span className="ml-1">🎵 GRAMMCHAT</span>
         </button>
-        <button
-          className="bg-[#ffee00] text-[#111] text-[9px] pl-4 pr-5 py-3 border-2 border-[#111] flex items-center relative overflow-hidden hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px]"
-          style={{ boxShadow: '4px 4px 0 #111' }}
-        >
-          <div className="absolute left-0 top-0 bottom-0 w-[6px] bg-[#ccaa00]" />
-          <span className="relative z-10 ml-1">🏆 LEADERBOARD</span>
+        <button className="bg-[#ffee00] text-[#111] text-[8px] px-4 py-2 border-2 border-[#111] relative overflow-hidden hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px]" style={{ boxShadow: '3px 3px 0 #111' }} onClick={(e) => e.stopPropagation()}>
+          <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#ccaa00]" />
+          <span className="ml-1">🏆 LEADERBOARD</span>
         </button>
       </div>
 
       {/* HUD: Legend */}
-      <div className="absolute bottom-6 right-6 z-30 bg-[#fff8e7] border-[3px] border-[#111] p-3 flex flex-col gap-2" style={{ boxShadow: '5px 5px 0 #111' }}>
-        <div className="text-[#111] text-[7px] mb-1 border-b-2 border-[#111] pb-1">LEVELS</div>
+      <div className="absolute bottom-4 right-4 z-30 bg-[#fff8e7] border-[3px] border-[#111] p-2" style={{ boxShadow: '4px 4px 0 #111' }}>
+        <div className="text-[#111] text-[6px] mb-1 border-b border-[#111] pb-1">LEVELS</div>
         {Object.entries(LEVEL_META).map(([key, level]) => (
-          <div key={key} className="flex items-center gap-2">
-            <svg width="12" height="12" viewBox="0 0 16 16" style={{ imageRendering: 'pixelated' }}>
-              <IsoBlock x={2} y={4} w={6} d={6} h={6} color={level.color} />
-            </svg>
-            <div className="text-[7px] text-[#111]">{level.name}</div>
+          <div key={key} className="flex items-center gap-1 mt-1">
+            <div className="w-[8px] h-[8px] border border-[#111]" style={{ backgroundColor: level.color }} />
+            <div className="text-[5px] text-[#111]">{level.name}</div>
           </div>
         ))}
       </div>

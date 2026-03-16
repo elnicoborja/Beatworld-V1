@@ -3,6 +3,7 @@ import { useLocation, useParams } from 'wouter';
 import { useGameState } from '@/hooks/use-game-state';
 import { CITIES } from '@/lib/game-data';
 import { audio } from '@/lib/audio';
+import IsometricSprite from '@/components/IsometricSprite';
 
 const C = {
   skyBlue: '#87ceeb', cream: '#fff8e7', hotPink: '#ff3399', magenta: '#cc0066',
@@ -10,6 +11,15 @@ const C = {
   orange: '#ff8800', teal: '#00aaaa', purple: '#6600cc', black: '#111111',
   gray: '#888899', asphalt: '#334455',
 };
+
+function shade(col: string, amt: number) {
+  const c = col.startsWith('#') ? col.slice(1) : col;
+  const num = parseInt(c, 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + amt));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt));
+  const b = Math.min(255, Math.max(0, (num & 0xff) + amt));
+  return '#' + ((b | (g << 8) | (r << 16)) >>> 0).toString(16).padStart(6, '0');
+}
 
 export default function StudioScreen() {
   const { cityId } = useParams();
@@ -149,24 +159,18 @@ export default function StudioScreen() {
           <div className="bw-panel p-4 flex flex-col items-center">
             <div className="halftone-overlay" />
             <div className="relative z-10 w-full">
-              <div className="bg-[#87ceeb] border-2 border-[#111] h-48 w-full flex items-end justify-center relative overflow-hidden mb-4" style={{ boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.1)' }}>
-                <div className="absolute bottom-4 w-20 h-6 bg-[#6600cc] opacity-20 rounded-[100%] blur-[2px]" />
-                <svg viewBox="0 0 24 48" className="h-40 w-auto relative z-10" style={{ imageRendering: 'pixelated' }}>
-                  <rect x="6" y="4" width="12" height="8" fill={charData.skinTone || '#f1c27d'} />
-                  <rect x="6" y="1" width="12" height="3" fill={charData.hairColor || '#ffee00'} />
-                  <rect x="8" y="7" width="1" height="1" fill="#000" />
-                  <rect x="14" y="7" width="1" height="1" fill="#000" />
-                  <rect x="5" y="12" width="14" height="16" fill={charData.topColor || '#ff3399'} />
-                  <rect x="3" y="13" width="2" height="5" fill={charData.topColor || '#ff3399'} />
-                  <rect x="19" y="13" width="2" height="5" fill={charData.topColor || '#ff3399'} />
-                  <rect x="3" y="18" width="2" height="7" fill={charData.skinTone || '#f1c27d'} />
-                  <rect x="19" y="18" width="2" height="7" fill={charData.skinTone || '#f1c27d'} />
-                  <rect x="5" y="28" width="14" height="4" fill={charData.pantsColor || '#0050cc'} />
-                  <rect x="5" y="32" width="6" height="8" fill={charData.pantsColor || '#0050cc'} />
-                  <rect x="13" y="32" width="6" height="8" fill={charData.pantsColor || '#0050cc'} />
-                  <rect x="5" y="40" width="4" height="8" fill="#222244" />
-                  <rect x="15" y="40" width="4" height="8" fill="#222244" />
-                </svg>
+              <div className="bg-[#87ceeb] border-2 border-[#111] h-48 w-full flex items-center justify-center relative overflow-hidden mb-4" style={{ boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.1)' }}>
+                <IsometricSprite
+                  skinTone={charData.skinTone || '#f1c27d'}
+                  skinShadow={charData.skinTone ? shade(charData.skinTone, -30) : '#c8903a'}
+                  hairColor={charData.hairColor || '#111111'}
+                  hairStyle={(charData.hairStyle || 'fade').toUpperCase()}
+                  topColor={charData.topColor || '#ff3399'}
+                  pantsColor={charData.pantsColor || '#0050cc'}
+                  accessory={(charData.accessory || 'none').toUpperCase()}
+                  angle={45}
+                  size={100}
+                />
               </div>
 
               <div className="bg-[#111] text-[#fff8e7] p-2 border-2 border-[#111] mb-2 text-center text-[10px]">

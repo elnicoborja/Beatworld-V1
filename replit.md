@@ -15,10 +15,10 @@ A pixel art music production game built with React + Vite, Three.js, Web Audio A
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **3D/Graphics**: Three.js / @react-three/fiber (world map)
 - **Audio**: Web Audio API (8-bit synthesized instruments)
-- **Animations**: Framer Motion
+- **Graphics**: SVG isometric pixel art (eboy aesthetic), no Three.js
 - **Styling**: Tailwind CSS + Press Start 2P pixel font
+- **Animations**: Pure CSS animations (no framer-motion dependency)
 
 ## Game Structure
 
@@ -49,7 +49,8 @@ artifacts/
 │       ├── hooks/
 │       │   └── use-game-state.tsx # GameContext + localStorage persistence
 │       ├── components/
-│       │   ├── map/WorldMap.tsx   # 2D world map with city pins
+│       │   ├── IsometricSprite.tsx   # 4-direction isometric character (SE/SW/NW/NE), IsoBox prisms
+│       │   ├── map/WorldMap.tsx      # Mario 3-style node-path map with isometric tiles
 │       │   └── ui/PixelButton.tsx, PixelPanel.tsx
 │       └── pages/
 │           ├── StartScreen.tsx
