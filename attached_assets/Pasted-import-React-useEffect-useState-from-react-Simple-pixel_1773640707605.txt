@@ -1,0 +1,192 @@
+import React, { useEffect, useState } from 'react';
+
+// Simple pixel map for the globe (1: water, 2: land)
+const GLOBE_PIXELS = [
+  "      11111111      ",
+  "    111112211111    ",
+  "   11111222211111   ",
+  "  1111122221111111  ",
+  " 111111222111111111 ",
+  " 111111111111122211 ",
+  "11111111111111222211",
+  "11111111111111222211",
+  "11111111111111122111",
+  "11111111111111111111",
+  "11111111111111111111",
+  " 111111111111221111 ",
+  " 111111111112221111 ",
+  "  1111111111221111  ",
+  "   11111111111111   ",
+  "    111111111111    ",
+  "      11111111      "
+];
+
+export default function StartScreen() {
+  const [hasSave, setHasSave] = useState(true); // Mocking localStorage save state
+
+  useEffect(() => {
+    // In a real app: setHasSave(!!localStorage.getItem('beatworld_save'))
+  }, []);
+
+  return (
+    <div className="relative min-h-screen w-full bg-[#0a0a1a] text-[#e0e0ff] uppercase overflow-hidden font-press-start selection:bg-[#ff00ff] selection:text-[#0a0a1a]">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        .font-press-start {
+          font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Overlays */
+        .scanlines {
+          background: repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 0px,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.12) 2px,
+            rgba(0, 0, 0, 0.12) 4px
+          );
+          animation: crtFlicker 0.1s infinite;
+          pointer-events: none;
+        }
+
+        .grid-overlay {
+          background-image: 
+            linear-gradient(rgba(255, 0, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 255, 0.03) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        .radial-vignette {
+          background: radial-gradient(circle at center, transparent 0%, #0a0a1a 100%);
+          pointer-events: none;
+        }
+
+        /* Animations */
+        @keyframes crtFlicker {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.85; }
+        }
+
+        @keyframes titlePulse {
+          0%, 100% {
+            text-shadow: 0 0 10px #ff00ff, 0 0 30px #ff00ff, 3px 3px 0px #000;
+          }
+          50% {
+            text-shadow: 0 0 20px #ff00ff, 0 0 50px #ff00ff, 3px 3px 0px #000;
+          }
+        }
+        .animate-title-pulse {
+          animation: titlePulse 2s infinite ease-in-out;
+        }
+
+        @keyframes globeSpin {
+          0% { transform: rotateY(0deg); }
+          100% { transform: rotateY(360deg); }
+        }
+        .animate-globe {
+          animation: globeSpin 40s infinite linear;
+          transform-style: preserve-3d;
+        }
+
+        @keyframes marquee {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          animation: marquee 15s infinite linear;
+          display: inline-block;
+          white-space: nowrap;
+        }
+
+        @keyframes buttonBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        .animate-blink {
+          animation: buttonBlink 1s infinite;
+        }
+
+        /* Utility */
+        .pixel-shadow-magenta { box-shadow: 4px 4px 0px #000; }
+        .pixel-shadow-cyan { box-shadow: 4px 4px 0px #000; }
+        
+        .btn-hover:hover { filter: brightness(1.2); }
+        .btn-active:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #000; }
+      `}</style>
+
+      {/* 1. Base is the div background */}
+      
+      {/* 2. SVG Pixel Art Globe */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.18] z-0 overflow-hidden">
+        <svg 
+          viewBox="0 0 20 17" 
+          className="w-[420px] h-auto animate-globe mix-blend-screen"
+          style={{ imageRendering: 'pixelated' }}
+        >
+          {GLOBE_PIXELS.map((row, y) => 
+            row.split('').map((char, x) => {
+              if (char === '1') return <rect key={`${x}-${y}`} x={x} y={y} width="1.05" height="1.05" fill="#0050ff" />;
+              if (char === '2') return <rect key={`${x}-${y}`} x={x} y={y} width="1.05" height="1.05" fill="#00ff00" />;
+              return null;
+            })
+          )}
+        </svg>
+      </div>
+
+      {/* 3, 4, 5. Overlays */}
+      <div className="absolute inset-0 grid-overlay z-10" />
+      <div className="absolute inset-0 scanlines z-20" />
+      <div className="absolute inset-0 radial-vignette z-30" />
+
+      {/* Main Content */}
+      <main className="relative z-40 flex flex-col items-center justify-center min-h-screen px-4 pb-16">
+        
+        {/* Top Icons */}
+        <div className="text-[#ff00ff] text-base mb-6 tracking-[8px]" style={{ textShadow: '0 0 8px #ff00ff' }}>
+          ♩ ♪ ♩
+        </div>
+
+        {/* Title */}
+        <h1 className="text-[36px] md:text-[64px] text-[#ff00ff] animate-title-pulse text-center leading-tight">
+          BEATWORLD
+        </h1>
+
+        {/* Subtitle */}
+        <p className="text-[10px] text-[#00ffff] mt-4 tracking-[3px] text-center max-w-md leading-relaxed" style={{ textShadow: '0 0 8px #00ffff' }}>
+          BEAT THE WORLD · ONE CITY AT A TIME
+        </p>
+
+        {/* Divider */}
+        <div className="w-[200px] h-[2px] bg-[#ff00ff] my-[32px] mx-auto shadow-[0_0_8px_#ff00ff]" />
+
+        {/* Buttons */}
+        <div className="w-[240px] flex flex-col gap-4">
+          <button className="w-full bg-[#ff00ff] text-[#0a0a1a] border-2 border-[#ff00ff] text-[11px] py-4 px-6 uppercase pixel-shadow-magenta btn-hover btn-active transition-all outline-none focus:ring-2 focus:ring-[#ffff00] focus:ring-offset-2 focus:ring-offset-[#0a0a1a]">
+            NEW GAME
+          </button>
+          
+          {hasSave && (
+            <button className="w-full bg-transparent text-[#00ffff] border-2 border-[#00ffff] text-[11px] py-4 px-6 uppercase pixel-shadow-cyan btn-hover btn-active animate-blink transition-all outline-none focus:ring-2 focus:ring-[#ffff00] focus:ring-offset-2 focus:ring-offset-[#0a0a1a]" style={{ textShadow: '0 0 8px #00ffff', boxShadow: '0 0 8px inset #00ffff, 4px 4px 0px #000' }}>
+              CONTINUE
+            </button>
+          )}
+        </div>
+      </main>
+
+      {/* Bottom Ticker */}
+      <div className="fixed bottom-0 left-0 w-full bg-[#111133] border-t border-[#ff00ff] h-8 flex items-center overflow-hidden z-50">
+        {/* Double container for seamless standard marquee loop */}
+        <div className="animate-marquee whitespace-nowrap text-[#ffff00] text-[8px] tracking-widest" style={{ textShadow: '0 0 4px #ffff00' }}>
+          <span className="inline-block pr-8">
+            ♩ BEATWORLD v1.0 · 18 CITIES · 6 LEVELS · BECOME THE TOP PRODUCER · NEW YORK · LONDON · BERLIN · RIO · MEDELLÍN · TULUM · ♩
+          </span>
+          <span className="inline-block pr-8">
+            ♩ BEATWORLD v1.0 · 18 CITIES · 6 LEVELS · BECOME THE TOP PRODUCER · NEW YORK · LONDON · BERLIN · RIO · MEDELLÍN · TULUM · ♩
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
