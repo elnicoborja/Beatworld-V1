@@ -16,9 +16,10 @@ const JOIN_SUBJECT = 'Beat World — Join the Directory';
 const MOCK_PRODUCERS = [
   { name: 'DJ PRIMO',        city: 'NEW YORK, USA',     rig: 'BOOMBOX',          rigType: 'boombox',           avatarVariant: 1,      bio: 'Boom bap loyalist building a Bronx-style rig.' },
   { name: 'MARCELA BASS',    city: 'CARTAGENA, COL',    rig: 'PICÓ STACK',       rigType: 'pico',        avatarVariant: 2,  bio: 'Custom picó painter mixing champeta and reggaeton.' },
-  { name: 'TOKYO BREAKER',   city: 'TOKYO, JPN',        rig: 'BOOMBOX',          rigType: 'boombox',           avatarVariant: 3, bio: 'Late-night chops in a 6-tatami bedroom studio.' },
+  { name: 'TOKYO BREAKER',   city: 'TOKYO, JPN',        rig: 'BASS BOTTOM',      rigType: 'bass-bottom',       avatarVariant: 3, bio: 'Late-night chops in a 6-tatami bedroom studio.' },
   { name: 'BERLIN GHOST',    city: 'BERLIN, DEU',       rig: 'WAREHOUSE STACK',  rigType: 'warehouse-stack',   avatarVariant: 4,  bio: 'Function-One disciple. Industrial techno only.' },
   { name: 'SOFIA SYSTEM',    city: 'SÃO PAULO, BRA',    rig: 'BAILE FUNK TRUCK', rigType: 'baile-funk-truck',  avatarVariant: 5,  bio: 'Wheels in the favela, bass in the air.' },
+  { name: 'SONIDO LUZ',      city: 'PUEBLA, MEX',       rig: 'SONIDERO RIG',     rigType: 'sonidero',          avatarVariant: 2,  bio: 'Cumbia MC energy with custom neon tower signage.' },
 ];
 
 export class DirectoryScene {
@@ -154,8 +155,8 @@ export class DirectoryScene {
     const head = document.createElement('div');
     head.style.cssText = 'display:flex; gap:10px; align-items:flex-start;';
     const avatar = document.createElement('div');
-    avatar.style.cssText = 'width:48px; height:48px; flex-shrink:0; display:flex; align-items:center; justify-content:center;';
-    avatar.innerHTML = renderDirectoryAvatar(p.avatarVariant, { size: 48, ariaLabel: `${p.name} avatar` });
+    avatar.style.cssText = 'width:64px; height:64px; flex-shrink:0; display:flex; align-items:center; justify-content:center;';
+    avatar.innerHTML = renderDirectoryAvatar(p.avatarVariant, { size: 64, ariaLabel: `${p.name} avatar` });
     head.appendChild(avatar);
 
     const meta = document.createElement('div');
@@ -169,8 +170,8 @@ export class DirectoryScene {
     card.appendChild(head);
 
     const piece = document.createElement('div');
-    piece.style.cssText = 'width:100%; height:100px; display:flex; align-items:center; justify-content:center;';
-    piece.innerHTML = renderDirectoryRigIcon(p.rigType, { size: 92, ariaLabel: `${p.rig} icon` });
+    piece.style.cssText = 'width:100%; height:108px; display:flex; align-items:center; justify-content:center;';
+    piece.innerHTML = renderDirectoryRigIcon(p.rigType, { size: 96, ariaLabel: `${p.rig} icon` });
     card.appendChild(piece);
 
     const bio = document.createElement('div');
