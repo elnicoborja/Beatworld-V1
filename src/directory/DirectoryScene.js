@@ -7,18 +7,18 @@
 import { spriteImage, characterPartUrl } from '../ui/SpriteImage.js';
 import { mountSoundOsFooter } from '../ui/SoundOsFooter.js';
 import { CHORD_PROGRESSIONS } from '../studio/AudioEngine.js';
-import { renderProducerAvatar, renderRigThumbnail } from '../art/directory-sprites.js';
+import { renderDirectoryAvatar, renderDirectoryRigIcon } from '../art/directory-sprites.js';
 
 // TODO: switch to Klaviyo POST when list is provisioned.
 const JOIN_EMAIL_TO = 'hola@nicoborja.com';
 const JOIN_SUBJECT = 'Beat World — Join the Directory';
 
 const MOCK_PRODUCERS = [
-  { name: 'DJ PRIMO',        city: 'NEW YORK, USA',     rig: 'BOOMBOX',          rigType: 'boombox',           avatarSeed: 'dj-primo',      bio: 'Boom bap loyalist building a Bronx-style rig.' },
-  { name: 'MARCELA BASS',    city: 'CARTAGENA, COL',    rig: 'PICÓ STACK',       rigType: 'pico-stack',        avatarSeed: 'marcela-bass',  bio: 'Custom picó painter mixing champeta and reggaeton.' },
-  { name: 'TOKYO BREAKER',   city: 'TOKYO, JPN',        rig: 'BOOMBOX',          rigType: 'boombox',           avatarSeed: 'tokyo-breaker', bio: 'Late-night chops in a 6-tatami bedroom studio.' },
-  { name: 'BERLIN GHOST',    city: 'BERLIN, DEU',       rig: 'WAREHOUSE STACK',  rigType: 'warehouse-stack',   avatarSeed: 'berlin-ghost',  bio: 'Function-One disciple. Industrial techno only.' },
-  { name: 'SOFIA SYSTEM',    city: 'SÃO PAULO, BRA',    rig: 'BAILE FUNK TRUCK', rigType: 'baile-funk-truck',  avatarSeed: 'sofia-system',  bio: 'Wheels in the favela, bass in the air.' },
+  { name: 'DJ PRIMO',        city: 'NEW YORK, USA',     rig: 'BOOMBOX',          rigType: 'boombox',           avatarVariant: 1,      bio: 'Boom bap loyalist building a Bronx-style rig.' },
+  { name: 'MARCELA BASS',    city: 'CARTAGENA, COL',    rig: 'PICÓ STACK',       rigType: 'pico',        avatarVariant: 2,  bio: 'Custom picó painter mixing champeta and reggaeton.' },
+  { name: 'TOKYO BREAKER',   city: 'TOKYO, JPN',        rig: 'BOOMBOX',          rigType: 'boombox',           avatarVariant: 3, bio: 'Late-night chops in a 6-tatami bedroom studio.' },
+  { name: 'BERLIN GHOST',    city: 'BERLIN, DEU',       rig: 'WAREHOUSE STACK',  rigType: 'warehouse-stack',   avatarVariant: 4,  bio: 'Function-One disciple. Industrial techno only.' },
+  { name: 'SOFIA SYSTEM',    city: 'SÃO PAULO, BRA',    rig: 'BAILE FUNK TRUCK', rigType: 'baile-funk-truck',  avatarVariant: 5,  bio: 'Wheels in the favela, bass in the air.' },
 ];
 
 export class DirectoryScene {
@@ -155,7 +155,7 @@ export class DirectoryScene {
     head.style.cssText = 'display:flex; gap:10px; align-items:flex-start;';
     const avatar = document.createElement('div');
     avatar.style.cssText = 'width:48px; height:48px; flex-shrink:0; display:flex; align-items:center; justify-content:center;';
-    avatar.innerHTML = renderProducerAvatar(p.avatarSeed, { size: 48 });
+    avatar.innerHTML = renderDirectoryAvatar(p.avatarVariant, { size: 48, ariaLabel: `${p.name} avatar` });
     head.appendChild(avatar);
 
     const meta = document.createElement('div');
@@ -170,7 +170,7 @@ export class DirectoryScene {
 
     const piece = document.createElement('div');
     piece.style.cssText = 'width:100%; height:100px; display:flex; align-items:center; justify-content:center;';
-    piece.innerHTML = renderRigThumbnail(p.rigType, { size: 92 });
+    piece.innerHTML = renderDirectoryRigIcon(p.rigType, { size: 92, ariaLabel: `${p.rig} icon` });
     card.appendChild(piece);
 
     const bio = document.createElement('div');

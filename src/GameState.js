@@ -42,6 +42,13 @@ const DEFAULT_STATE = {
     torso: 'boombap',  // mid-{id}.png
     legs: 'boombap',   // bottom-{id}.png
   },
+
+  // ── 2-axis character identity (V2.1) ───────────────────────
+  characterIdentity: {
+    style: 'boombap',
+    presentation: 'm',
+  },
+
 };
 
 export class GameState {
@@ -68,6 +75,10 @@ export class GameState {
         merged.characterParts = {
           ...DEFAULT_STATE.characterParts,
           ...(parsed.characterParts || {}),
+        };
+        merged.characterIdentity = {
+          ...DEFAULT_STATE.characterIdentity,
+          ...(parsed.characterIdentity || {}),
         };
         return merged;
       }
@@ -184,6 +195,15 @@ export class GameState {
     // zone: 'head' | 'torso' | 'legs'
     // identity: 'boombap' | 'gfunk' | 'punk' | 'beatmaker'
     this.data.characterParts[zone] = identity;
+    this._save();
+  }
+
+  setCharacterIdentity({ style, presentation }) {
+    this.data.characterIdentity = {
+      ...this.data.characterIdentity,
+      ...(style ? { style } : {}),
+      ...(presentation ? { presentation } : {}),
+    };
     this._save();
   }
 
