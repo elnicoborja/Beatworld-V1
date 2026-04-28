@@ -26,6 +26,17 @@ const LEVEL_AUDIO_ID = {
   'new-york': 'level-01-nyc',
 };
 
+// Friend tip bubbles — cycled at 6s intervals while in the studio.
+// Order matters: the first 2 are onboarding tips, the rest rotate.
+const FRIEND_TIPS = [
+  'CHOP THE SAMPLE,\nDON\'T LOOP IT.',
+  'KICK ON 1 AND 9,\nSNARE ON 5 AND 13.',
+  'OPEN HATS ARE LIKE\nSALT — A LITTLE GOES FAR.',
+  'TURN UP THE BASS\nUNTIL THE WALLS COMPLAIN.',
+  'BREAK THE GRID\nONCE PER LOOP.',
+  'TRY MORE REVERB\nON THE SNARE.',
+];
+
 export class StudioScene {
   // Constructor signature is unchanged so main.js doesn't need a touch.
   constructor(scene, camera, gameState, audioEngine) {
@@ -46,6 +57,10 @@ export class StudioScene {
     this.gridCells = [];
     this.variantButtons = {}; // type → HTMLButtonElement[]
     this.chordButtons = [];
+    this.tipBubble = null;
+    this.tipTimer = null;
+    this.tipIdx = 0;
+    this.mixerExpanded = false;
   }
 
   loadCity(cityId) {
@@ -99,6 +114,12 @@ export class StudioScene {
       ph.textContent = '[STUDIO BACKDROP — NYC]';
       top.appendChild(ph);
     };
+
+    // Friend speech bubble — positioned over the friend in the upper-right
+    // third of the backdrop (per L1 + L2 prompt specs which reserve that
+    // area for the bubble). Cycles tips every 6s.
+    top.appendChild(this._buildFriendBubble());
+
     this.el.appendChild(top);
 
     // ── Bottom half: sequencer panel ─────────────────────────
@@ -114,6 +135,7 @@ export class StudioScene {
     panel.appendChild(this._buildHeader());
     panel.appendChild(this._buildChordPicker());
     panel.appendChild(this._buildSequencer());
+    panel.appendChild(this._buildMixerPanel());
 
     this.el.appendChild(panel);
     this.el.appendChild(this._buildPersistentExitButton());
@@ -441,10 +463,270 @@ export class StudioScene {
     this.playing = false;
   }
 
+  // ── Friend tip bubble ──────────────────────────────────────
+  // CSS speech bubble over the upper-right third of the studio backdrop.
+  // The art prompts reserve that headroom on purpose. Cycles every 6s.
+  _buildFriendBubble() {
+    const bubble = document.createElement('div');
+    bubble.style.cssText = `
+      position:absolute; top:8%; right:6%;
+      max-width:240px; padding:10px 12px;
+      background:rgba(255,255,255,0.94); color:#0a0a1e;
+      border:2px solid #ffaa00;
+      box-shadow: 4px 4px 0 #0a0a1e, 0 0 16px rgba(255,170,0,0.4);
+      font-family:'Press Start 2P', monospace; font-size:7px;
+      line-height:1.7; letter-spacing:0.5px; white-space:pre-line;
+      cursor:pointer; user-select:none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index:10;
+    `;
+    // Tail pointing down-right toward the friend
+    const tail = document.createElement('div');
+    tail.style.cssText = `
+      position:absolute; bottom:-10px; right:24px;
+      width:0; height:0;
+      border-left:8px solid transparent;
+      border-right:8px solid transparent;
+      border-top:10px solid #ffaa00;
+    `;
+    bubble.appendChild(tail);
+    const text = document.createElement('div');
+    text.style.cssText = 'position:relative; z-index:1;';
+    text.textContent = FRIEND_TIPS[0];
+    bubble.appendChild(text);
+    // Click to advance
+    bubble.addEventListener('click', () => this._advanceTip());
+
+    this.tipBubble = { el: bubble, textEl: text };
+    this.tipIdx = 0;
+    this.tipTimer = setInterval(() => this._advanceTip(), 6000);
+    return bubble;
+  }
+
+  _advanceTip() {
+    if (!this.tipBubble) return;
+    this.tipIdx = (this.tipIdx + 1) % FRIEND_TIPS.length;
+    const { el, textEl } = this.tipBubble;
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-4px)';
+    setTimeout(() => {
+      textEl.textContent = FRIEND_TIPS[this.tipIdx];
+      el.style.opacity = '1';
+      el.style.transform = '';
+    }, 250);
+  }
+
+  // ── Mixer panel ────────────────────────────────────────────
+  // Collapsible per-track strip with vol + reverb send + delay send sliders,
+  // plus a master row at the top. Compact + pixel-styled. Default collapsed
+  // so the sequencer remains the visual anchor.
+  _buildMixerPanel() {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = `
+      margin-top:12px; padding-top:8px;
+      border-top:1px dashed #333;
+    `;
+
+    // Header row with toggle
+    const header = document.createElement('div');
+    header.style.cssText = `
+      display:flex; justify-content:space-between; align-items:center;
+      cursor:pointer; padding:6px 0;
+    `;
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-size:8px; color:#ffaa00; letter-spacing:2px;';
+    titleEl.textContent = '🎛  MIXER';
+    const arrow = document.createElement('div');
+    arrow.style.cssText = 'font-size:8px; color:#888;';
+    arrow.textContent = this.mixerExpanded ? '▼' : '▶';
+    header.appendChild(titleEl);
+    header.appendChild(arrow);
+
+    const body = document.createElement('div');
+    body.style.cssText = `
+      display:${this.mixerExpanded ? 'flex' : 'none'};
+      flex-direction:column; gap:6px; padding:8px 0;
+    `;
+
+    header.addEventListener('click', () => {
+      this.mixerExpanded = !this.mixerExpanded;
+      body.style.display = this.mixerExpanded ? 'flex' : 'none';
+      arrow.textContent = this.mixerExpanded ? '▼' : '▶';
+    });
+
+    // Master row
+    body.appendChild(this._buildMasterStrip());
+
+    // Per-track rows (only the instruments this level actually uses)
+    for (const inst of this.instruments) {
+      body.appendChild(this._buildTrackStrip(inst));
+    }
+
+    // FX bus return rows (reverb wet + delay wet)
+    body.appendChild(this._buildFxReturnStrip('reverb', 'REVERB BUS'));
+    body.appendChild(this._buildFxReturnStrip('delay',  'DELAY BUS'));
+
+    wrap.appendChild(header);
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  _buildMasterStrip() {
+    const row = document.createElement('div');
+    row.style.cssText = `
+      display:grid; grid-template-columns:80px 1fr 60px;
+      gap:8px; align-items:center;
+      padding:6px 8px; background:rgba(255,170,0,0.06);
+      border-left:3px solid #ffaa00;
+    `;
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:7px; color:#ffaa00; letter-spacing:1px;';
+    label.textContent = 'MASTER';
+    row.appendChild(label);
+
+    const slider = this._slider(-36, 6, 0.5,
+      this.gameState.data.audioPrefs.mix.master ?? 0,
+      '#ffaa00',
+      (v) => {
+        this.audioEngine.setMasterVolume(v);
+        this.gameState.setMixMaster(v);
+        valEl.textContent = `${v.toFixed(0)} dB`;
+      }
+    );
+    row.appendChild(slider);
+
+    const valEl = document.createElement('div');
+    valEl.style.cssText = 'font-size:6px; color:#ffaa00; text-align:right;';
+    valEl.textContent = `${(this.gameState.data.audioPrefs.mix.master ?? 0).toFixed(0)} dB`;
+    row.appendChild(valEl);
+    return row;
+  }
+
+  _buildTrackStrip(inst) {
+    const row = document.createElement('div');
+    const trackColor = TRACK_COLORS[inst.type] || '#888';
+    row.style.cssText = `
+      display:grid; grid-template-columns:80px 1fr 1fr 1fr;
+      gap:8px; align-items:center;
+      padding:5px 8px; background:rgba(255,255,255,0.02);
+      border-left:3px solid ${trackColor};
+    `;
+    const label = document.createElement('div');
+    label.style.cssText = `font-size:6px; color:${trackColor}; letter-spacing:1px;`;
+    label.textContent = inst.name.toUpperCase();
+    row.appendChild(label);
+
+    const mix = this.gameState.data.audioPrefs.mix;
+
+    // Volume slider (-36 .. +6 dB)
+    row.appendChild(this._labeledSlider(
+      'VOL', -36, 6, 0.5,
+      mix.trackVol[inst.type] ?? 0,
+      trackColor,
+      (v) => {
+        this.audioEngine.setInstrumentVolume(inst.type, v);
+        this.gameState.setMixTrackVol(inst.type, v);
+      },
+      (v) => `${v.toFixed(0)}`
+    ));
+
+    // Reverb send (0 .. 1)
+    row.appendChild(this._labeledSlider(
+      'REV', 0, 1, 0.01,
+      mix.reverbSend[inst.type] ?? 0,
+      '#00ddff',
+      (v) => {
+        this.audioEngine.setReverbSend(inst.type, v);
+        this.gameState.setMixReverbSend(inst.type, v);
+      },
+      (v) => `${Math.round(v * 100)}`
+    ));
+
+    // Delay send (0 .. 1)
+    row.appendChild(this._labeledSlider(
+      'DLY', 0, 1, 0.01,
+      mix.delaySend[inst.type] ?? 0,
+      '#ff3399',
+      (v) => {
+        this.audioEngine.setDelaySend(inst.type, v);
+        this.gameState.setMixDelaySend(inst.type, v);
+      },
+      (v) => `${Math.round(v * 100)}`
+    ));
+
+    return row;
+  }
+
+  _buildFxReturnStrip(kind, label) {
+    const row = document.createElement('div');
+    const color = kind === 'reverb' ? '#00ddff' : '#ff3399';
+    row.style.cssText = `
+      display:grid; grid-template-columns:80px 1fr 60px;
+      gap:8px; align-items:center;
+      padding:4px 8px; background:rgba(255,255,255,0.015);
+      border-left:3px dashed ${color};
+    `;
+    const lab = document.createElement('div');
+    lab.style.cssText = `font-size:6px; color:${color}; letter-spacing:1px;`;
+    lab.textContent = label;
+    row.appendChild(lab);
+
+    const initial = kind === 'reverb'
+      ? this.gameState.data.audioPrefs.mix.reverbWet
+      : this.gameState.data.audioPrefs.mix.delayWet;
+
+    const slider = this._slider(0, 1, 0.01, initial, color, (v) => {
+      if (kind === 'reverb') {
+        this.audioEngine.setReverbWet(v);
+        this.gameState.setMixReverbWet(v);
+      } else {
+        this.audioEngine.setDelayWet(v);
+        this.gameState.setMixDelayWet(v);
+      }
+      valEl.textContent = `${Math.round(v * 100)}%`;
+    });
+    row.appendChild(slider);
+
+    const valEl = document.createElement('div');
+    valEl.style.cssText = `font-size:6px; color:${color}; text-align:right;`;
+    valEl.textContent = `${Math.round(initial * 100)}%`;
+    row.appendChild(valEl);
+    return row;
+  }
+
+  _slider(min, max, step, value, color, onInput) {
+    const inp = document.createElement('input');
+    inp.type = 'range';
+    inp.min = String(min); inp.max = String(max); inp.step = String(step);
+    inp.value = String(value);
+    inp.style.cssText = `
+      width:100%; height:14px; cursor:pointer;
+      accent-color:${color};
+    `;
+    inp.addEventListener('input', () => onInput(parseFloat(inp.value)));
+    return inp;
+  }
+
+  _labeledSlider(prefix, min, max, step, value, color, onInput, fmt) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:grid; grid-template-columns:24px 1fr 28px; gap:4px; align-items:center;';
+    const lab = document.createElement('div');
+    lab.style.cssText = `font-size:5px; color:${color}; letter-spacing:1px;`;
+    lab.textContent = prefix;
+    const sl = this._slider(min, max, step, value, color, (v) => { onInput(v); val.textContent = fmt(v); });
+    const val = document.createElement('div');
+    val.style.cssText = 'font-size:5px; color:#888; text-align:right;';
+    val.textContent = fmt(value);
+    wrap.appendChild(lab); wrap.appendChild(sl); wrap.appendChild(val);
+    return wrap;
+  }
+
   hide() {
     if (this.el) { this.el.remove(); this.el = null; }
     document.getElementById('studio-exit-modal')?.remove();
     this._stopAll();
+    if (this.tipTimer) { clearInterval(this.tipTimer); this.tipTimer = null; }
+    this.tipBubble = null;
     this.gridCells = [];
     this.variantButtons = {};
     this.chordButtons = [];

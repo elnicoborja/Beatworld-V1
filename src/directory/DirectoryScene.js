@@ -4,7 +4,7 @@
  * 6 cards: 5 mock + 1 YOU card showing the player's character composite + boombox.
  * Single CTA to join via mailto (real Klaviyo wiring is post-launch — see TODO below).
  */
-import { spriteImage, characterPartUrl } from '../ui/SpriteImage.js';
+import { spriteImage, characterImage } from '../ui/SpriteImage.js';
 import { mountSoundOsFooter } from '../ui/SoundOsFooter.js';
 import { CHORD_PROGRESSIONS } from '../studio/AudioEngine.js';
 
@@ -12,12 +12,72 @@ import { CHORD_PROGRESSIONS } from '../studio/AudioEngine.js';
 const JOIN_EMAIL_TO = 'hola@nicoborja.com';
 const JOIN_SUBJECT = 'Beat World — Join the Directory';
 
+// Mock producers shown alongside the player's YOU card.
+// `style` + `presentation` reuse the 12 character sprites already on disk
+// so each card has a real portrait instead of a placeholder rect.
+// `rigSprite` reuses existing soundsystem art when possible, falls back to
+// a labelled placeholder for rigs we haven't drawn yet (L3+).
 const MOCK_PRODUCERS = [
-  { name: 'DJ PRIMO',        city: 'NEW YORK, USA',     rig: 'BOOMBOX',          bio: 'Boom bap loyalist building a Bronx-style rig.' },
-  { name: 'MARCELA BASS',    city: 'CARTAGENA, COL',    rig: 'PICÓ STACK',       bio: 'Custom picó painter mixing champeta and reggaeton.' },
-  { name: 'TOKYO BREAKER',   city: 'TOKYO, JPN',        rig: 'BOOMBOX',          bio: 'Late-night chops in a 6-tatami bedroom studio.' },
-  { name: 'BERLIN GHOST',    city: 'BERLIN, DEU',       rig: 'WAREHOUSE STACK',  bio: 'Function-One disciple. Industrial techno only.' },
-  { name: 'SOFIA SYSTEM',    city: 'SÃO PAULO, BRA',    rig: 'BAILE FUNK TRUCK', bio: 'Wheels in the favela, bass in the air.' },
+  {
+    name: 'DJ PRIMO',
+    city: 'BRONX, NYC',
+    rig: 'BOOMBOX',
+    rigSprite: '/assets/sprites/soundsystem/boombox.png',
+    style: 'gfunk', presentation: 'm',
+    chord: 'BOOM BAP', bpm: 88,
+    badge: '★ FEATURED',
+    badgeColor: '#ffaa00',
+    bio: 'Boom bap loyalist. Chops only soul records pressed before 1974.',
+    quote: 'IF THE KICK DON\'T HIT YOU IN THE CHEST, IT\'S NOT DONE.',
+  },
+  {
+    name: 'MARCELA BASS',
+    city: 'SAN JUAN, PR',
+    rig: 'PICÓ STACK',
+    rigSprite: '/assets/sprites/soundsystem/pico.png',
+    style: 'beatmaker', presentation: 'f',
+    chord: 'DEMBOW',  bpm: 92,
+    badge: '🌴 LEVEL 2',
+    badgeColor: '#00ddff',
+    bio: 'Custom picó painter mixing perreo, dembow, and Old San Juan plena.',
+    quote: 'EL PERREO ES SAGRADO. NO LO TOQUES SI NO LO RESPETAS.',
+  },
+  {
+    name: 'TOKYO BREAKER',
+    city: 'SHIBUYA, JP',
+    rig: 'BOOMBOX',
+    rigSprite: '/assets/sprites/soundsystem/boombox.png',
+    style: 'otaku',   presentation: 'm',
+    chord: 'LOFI',    bpm: 86,
+    badge: '🌸 NEW',
+    badgeColor: '#ff66aa',
+    bio: 'Late-night chops in a 6-tatami bedroom studio. MPC + ramen.',
+    quote: 'THE QUIET SAMPLES HIT THE LOUDEST.',
+  },
+  {
+    name: 'BERLIN GHOST',
+    city: 'KREUZBERG, DE',
+    rig: 'WAREHOUSE STACK',
+    rigSprite: '/assets/sprites/soundsystem/warehouse.png',
+    style: 'punk',    presentation: 'f',
+    chord: 'TECHNO',  bpm: 132,
+    badge: null,
+    badgeColor: null,
+    bio: 'Function-One disciple. Industrial techno only. No melodies.',
+    quote: 'IF THE BASSLINE IS TOO MELODIC, DELETE IT.',
+  },
+  {
+    name: 'SOFIA SYSTEM',
+    city: 'SÃO PAULO, BR',
+    rig: 'BAILE FUNK TRUCK',
+    rigSprite: '/assets/sprites/soundsystem/baile-funk.png',
+    style: 'feline',  presentation: 'f',
+    chord: 'BAILE FUNK', bpm: 130,
+    badge: '🇧🇷 BR',
+    badgeColor: '#00cc44',
+    bio: 'Wheels in the favela, bass in the air. The truck IS the venue.',
+    quote: 'THE STREET IS THE ONLY VENUE THAT MATTERS.',
+  },
 ];
 
 export class DirectoryScene {
@@ -48,11 +108,12 @@ export class DirectoryScene {
     subtitle.textContent = 'PRODUCERS BUILDING THEIR RIGS.';
     body.appendChild(subtitle);
 
-    // Cards grid
+    // Cards grid — wider so the larger YOU card and full mock cards have
+    // room to breathe. Min track is 280px to keep avatars readable.
     const grid = document.createElement('div');
     grid.style.cssText = `
-      display:grid; gap:12px; width:100%; max-width:780px; margin:0 auto;
-      grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+      display:grid; gap:14px; width:100%; max-width:1080px; margin:0 auto;
+      grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
     `;
     // YOU card first
     grid.appendChild(this._buildYouCard());
@@ -88,53 +149,80 @@ export class DirectoryScene {
   _buildYouCard() {
     const card = document.createElement('div');
     card.style.cssText = `
-      padding:14px; border:2px solid #ffaa00;
+      padding:18px; border:2px solid #ffaa00;
       background:rgba(255,170,0,0.08);
-      box-shadow: 0 0 16px rgba(255,170,0,0.4), inset 0 0 8px rgba(255,170,0,0.2);
-      display:flex; flex-direction:column; gap:10px;
+      box-shadow: 0 0 20px rgba(255,170,0,0.45), inset 0 0 10px rgba(255,170,0,0.2);
+      display:flex; flex-direction:column; gap:12px;
+      position:relative;
     `;
     const tag = document.createElement('div');
-    tag.style.cssText = 'font-size:7px; color:#ffaa00; letter-spacing:2px;';
+    tag.style.cssText = `
+      position:absolute; top:-9px; left:14px;
+      background:#ffaa00; color:#0a0a1e;
+      font-size:7px; padding:3px 8px; letter-spacing:2px;
+    `;
     tag.textContent = 'YOU ★';
     card.appendChild(tag);
 
-    // Header row: character composite (small) + name/city
-    const head = document.createElement('div');
-    head.style.cssText = 'display:flex; gap:10px; align-items:center;';
-    const parts = this.gameState.data.characterParts;
-    const comp = document.createElement('div');
-    comp.style.cssText = 'display:flex; flex-direction:column; width:48px; height:144px; flex-shrink:0;';
-    comp.appendChild(spriteImage(characterPartUrl('top', parts.head),    'HEAD',  { width: 48, height: 48 }));
-    comp.appendChild(spriteImage(characterPartUrl('mid', parts.torso),   'TORSO', { width: 48, height: 48 }));
-    comp.appendChild(spriteImage(characterPartUrl('bottom', parts.legs), 'LEGS',  { width: 48, height: 48 }));
-    head.appendChild(comp);
-
-    const meta = document.createElement('div');
-    meta.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
-    const cpName = CHORD_PROGRESSIONS[this.gameState.data.audioPrefs.chordProgression || 0]?.name || 'BOOM BAP';
-    meta.innerHTML = `
-      <div style="font-size:9px; color:#fff; letter-spacing:1px;">${this.gameState.data.playerName}</div>
-      <div style="font-size:7px; color:#888;">YOUR CITY</div>
-      <div style="font-size:7px; color:#00ddff;">RIG: BOOMBOX</div>
-      <div style="font-size:6px; color:#888;">STYLE: ${cpName}</div>
+    // ── Hero portrait ─ character is the focal point.
+    // 192×288 (1.5x what it was) lets the sprite read at full detail.
+    const { style, presentation } = this.gameState.data;
+    const portraitWrap = document.createElement('div');
+    portraitWrap.style.cssText = `
+      width:100%; height:288px;
+      display:flex; justify-content:center; align-items:center;
+      background:rgba(0,0,0,0.25);
+      border:1px dashed rgba(255,170,0,0.35);
+      position:relative; overflow:hidden;
     `;
-    head.appendChild(meta);
-    card.appendChild(head);
+    const portrait = characterImage(style, presentation, { width: 192, height: 288 });
+    portraitWrap.appendChild(portrait);
 
-    // Boombox slot
-    const piece = document.createElement('div');
-    piece.style.cssText = 'width:100%; height:100px; display:flex; justify-content:center; align-items:center;';
-    piece.appendChild(spriteImage(
+    // Floating producer name overlay (bottom-left of portrait)
+    const nameOverlay = document.createElement('div');
+    nameOverlay.style.cssText = `
+      position:absolute; bottom:8px; left:8px;
+      background:rgba(10,10,30,0.85);
+      color:#ffaa00; font-size:9px; padding:4px 8px;
+      letter-spacing:1px; border-left:2px solid #ffaa00;
+    `;
+    nameOverlay.textContent = this.gameState.data.playerName;
+    portraitWrap.appendChild(nameOverlay);
+
+    card.appendChild(portraitWrap);
+
+    // Meta row
+    const cpName = CHORD_PROGRESSIONS[this.gameState.data.audioPrefs.chordProgression || 0]?.name || 'BOOM BAP';
+    const meta = document.createElement('div');
+    meta.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px 12px;';
+    meta.innerHTML = `
+      <div><div style="font-size:6px; color:#888;">CITY</div>
+           <div style="font-size:8px; color:#fff;">YOUR CITY</div></div>
+      <div><div style="font-size:6px; color:#888;">RIG</div>
+           <div style="font-size:8px; color:#00ddff;">BOOMBOX</div></div>
+      <div><div style="font-size:6px; color:#888;">STYLE</div>
+           <div style="font-size:8px; color:#ff3399;">${cpName}</div></div>
+      <div><div style="font-size:6px; color:#888;">CLOUT</div>
+           <div style="font-size:8px; color:#ffaa00;">${(this.gameState.data.clout || 0).toLocaleString()}</div></div>
+    `;
+    card.appendChild(meta);
+
+    // Boombox sprite + label row
+    const rigRow = document.createElement('div');
+    rigRow.style.cssText = `
+      display:flex; align-items:center; gap:14px;
+      padding-top:10px; border-top:1px dashed rgba(255,170,0,0.3);
+    `;
+    rigRow.appendChild(spriteImage(
       '/assets/sprites/soundsystem/boombox.png',
       'BOOMBOX',
-      { width: 100, height: 100, style: 'filter: drop-shadow(0 0 8px #ff3399);' }
+      { width: 80, height: 80, style: 'filter: drop-shadow(0 0 8px #ff3399); flex-shrink:0;' }
     ));
-    card.appendChild(piece);
-
-    const bio = document.createElement('div');
-    bio.style.cssText = 'font-size:6px; color:#aaa; line-height:1.6; font-style:italic;';
-    bio.textContent = '"FIRST BEAT. FIRST RIG. THE START OF SOMETHING."';
-    card.appendChild(bio);
+    const rigLabel = document.createElement('div');
+    rigLabel.style.cssText = 'font-size:6px; color:#aaa; line-height:1.7; font-style:italic;';
+    rigLabel.textContent = '"FIRST BEAT. FIRST RIG. THE START OF SOMETHING."';
+    rigRow.appendChild(rigLabel);
+    card.appendChild(rigRow);
 
     return card;
   }
@@ -143,40 +231,70 @@ export class DirectoryScene {
     const card = document.createElement('div');
     card.style.cssText = `
       padding:14px; border:1px solid #333;
-      background:rgba(20,20,50,0.5);
+      background:rgba(20,20,50,0.55);
       display:flex; flex-direction:column; gap:10px;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, transform 0.15s;
+      position:relative;
     `;
-    card.addEventListener('mouseenter', () => { card.style.borderColor = '#00ddff'; });
-    card.addEventListener('mouseleave', () => { card.style.borderColor = '#333'; });
+    card.addEventListener('mouseenter', () => {
+      card.style.borderColor = '#00ddff';
+      card.style.transform = 'translateY(-2px)';
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.borderColor = '#333';
+      card.style.transform = '';
+    });
 
+    // Optional badge corner
+    if (p.badge && p.badgeColor) {
+      const badge = document.createElement('div');
+      badge.style.cssText = `
+        position:absolute; top:-8px; right:10px;
+        background:${p.badgeColor}; color:#0a0a1e;
+        font-size:6px; padding:2px 6px; letter-spacing:1px;
+      `;
+      badge.textContent = p.badge;
+      card.appendChild(badge);
+    }
+
+    // Head row: real character avatar + name/city
     const head = document.createElement('div');
-    head.style.cssText = 'display:flex; gap:10px; align-items:flex-start;';
-    const avatar = document.createElement('div');
-    avatar.className = 'sprite-placeholder';
-    avatar.style.cssText = 'width:48px; height:48px; flex-shrink:0; font-size:6px;';
-    avatar.textContent = '[AVATAR]';
-    head.appendChild(avatar);
+    head.style.cssText = 'display:flex; gap:12px; align-items:flex-start;';
+    const avatarWrap = document.createElement('div');
+    avatarWrap.style.cssText = 'width:80px; height:120px; flex-shrink:0;';
+    avatarWrap.appendChild(characterImage(p.style, p.presentation, { width: 80, height: 120 }));
+    head.appendChild(avatarWrap);
 
     const meta = document.createElement('div');
-    meta.style.cssText = 'display:flex; flex-direction:column; gap:3px;';
+    meta.style.cssText = 'display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;';
     meta.innerHTML = `
       <div style="font-size:9px; color:#fff; letter-spacing:1px;">${p.name}</div>
       <div style="font-size:6px; color:#888;">${p.city}</div>
       <div style="font-size:7px; color:#00ddff;">RIG: ${p.rig}</div>
+      <div style="font-size:6px; color:#ff3399;">${p.chord} · ${p.bpm} BPM</div>
     `;
     head.appendChild(meta);
     card.appendChild(head);
 
+    // Rig sprite slot — uses real sprite if present, falls back to placeholder
     const piece = document.createElement('div');
-    piece.className = 'sprite-placeholder';
-    piece.style.cssText = 'width:100%; height:100px; font-size:7px;';
-    piece.textContent = `[${p.rig}]`;
+    piece.style.cssText = 'width:100%; height:90px; display:flex; justify-content:center; align-items:center;';
+    piece.appendChild(spriteImage(
+      p.rigSprite,
+      p.rig,
+      { width: 90, height: 90, style: 'filter: drop-shadow(0 0 6px #00ddff); opacity:0.85;' }
+    ));
     card.appendChild(piece);
 
+    // Quote — first the quote, then the descriptive bio (smaller)
+    const quote = document.createElement('div');
+    quote.style.cssText = 'font-size:6px; color:#fff; line-height:1.7; font-style:italic; padding:6px 8px; background:rgba(0,0,0,0.25); border-left:2px solid #00ddff;';
+    quote.textContent = `"${p.quote}"`;
+    card.appendChild(quote);
+
     const bio = document.createElement('div');
-    bio.style.cssText = 'font-size:6px; color:#888; line-height:1.6; font-style:italic;';
-    bio.textContent = `"${p.bio}"`;
+    bio.style.cssText = 'font-size:6px; color:#888; line-height:1.6;';
+    bio.textContent = p.bio;
     card.appendChild(bio);
 
     return card;

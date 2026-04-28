@@ -66,12 +66,23 @@ beat-world-2026/
 │           ├── soundsystem/           ← Soundsystem rig PNGs (boombox + 5 silhouettes + Coney Island unlock scene)
 │           ├── characters/
 │           │   ├── critic-xxl.png     ← XXL Mag critic portrait
-│           │   └── parts/             ← 12 character zone PNGs (top/mid/bottom × 4 identities)
+│           │   ├── boombap-m.png      ← 12 character sprites: 6 styles × 2 presentations
+│           │   ├── boombap-f.png      ← (256×384, transparent)
+│           │   ├── gfunk-m.png        ← Naming: {style}-{presentation}.png
+│           │   ├── gfunk-f.png        ← Styles: boombap | gfunk | punk | beatmaker | otaku | feline
+│           │   ├── punk-m.png         ← Presentations: m | f
+│           │   ├── punk-f.png         ← Fallback chain on missing presentation:
+│           │   ├── beatmaker-m.png    ←   1. {style}-{presentation}.png
+│           │   ├── beatmaker-f.png    ←   2. {style}-m.png
+│           │   ├── otaku-m.png        ←   3. labelled placeholder rect
+│           │   ├── otaku-f.png        ← Feline = anthropomorphic human-sized cat character
+│           │   ├── feline-m.png       ←   (biped, wears clothing, visually distinct from the
+│           │   └── feline-f.png       ←    5 human styles)
 │           ├── venues/                ← studio-nyc.png, gig-bk-court.png
 │           └── ui/                    ← review-magazine-cover.png, soundsystem-hangar.png
 └── src/
     ├── main.js                        ← Scene state machine + Three.js bootstrap + audio init
-    ├── GameState.js                   ← localStorage persistence (audioPrefs, characterParts, completedLevels, unlockedPieces, clout, playerName)
+    ├── GameState.js                   ← localStorage persistence (audioPrefs, style, presentation, completedLevels, unlockedPieces, clout, playerName) + migration from cadaver-exquisito / single-character / NB-presentation legacy shapes
     ├── GameData.js                    ← 24 city definitions (only 'new-york' is active in vertical slice)
     ├── data/
     │   └── LevelProgression.js        ← 6-level region→soundsystem-piece mapping (used by LevelSelect, SoundsystemReveal, ShareArtifact)
@@ -80,7 +91,7 @@ beat-world-2026/
     │   ├── SpriteImage.js             ← Helper: loads PNG, falls back to labeled placeholder rect on 404
     │   └── SoundOsFooter.js           ← Persistent "Built with SOUND OS" footer with utm tracking
     ├── character-select/
-    │   └── CharacterSelectScene.js    ← Cadaver exquisito picker (3 zones × 4 identities = 64 combinations)
+    │   └── CharacterSelectScene.js    ← Pick 1 of 6 styles × 2 presentations = 12 variants. Style cycle arrows + [M] [F] presentation pills. Future v1.1 will replace this with a user-uploaded character editor.
     ├── level-select/
     │   └── LevelSelectScene.js        ← 6 level cards, only L1 unlocked, EDIT CHARACTER button
     ├── studio/
@@ -176,7 +187,7 @@ beat-world-2026/
 - Add NPM dependencies beyond `three` and `tone`
 - Rewrite anything in React, TypeScript, or any other framework
 - Add a backend, API calls, authentication, or any networked persistence
-- Implement features that are post-launch (GRAMMCHAT social, leaderboards, battle mode, character customization beyond the cadaver exquisito mix-match)
+- Implement features that are post-launch (GRAMMCHAT social, leaderboards, battle mode, user-uploaded character editor — see v1.1 TODO in `CharacterSelectScene.js`)
 - Refactor `GameData.js` city data — the 24 cities stay intact even though only NYC is active in the vertical slice
 - Remove `WorldMapScene.js` or `CharacterCreatorUI.js` — they're legacy code paths kept for post-launch reactivation
 - Change the locked color palette
@@ -208,7 +219,7 @@ All in `SOUND OS/04_SOUND_AGENCY/BEATWORLD-APP/`:
 
 - The **soundsystem-as-reward mechanic** ties the brand metaphor (SOUND = SoundSystem) to the player's progression. Each region they conquer adds a region-specific rig piece. By Level 6 they have a global mashup (NYC boombox + Caribbean picó + Brazil baile funk truck + Andean bass cabinet + Mexico sonidero + Berlin warehouse stack).
 - The **directory glimpse screen** at the end of Level 1 channels the soundsystem.world cultural archive aesthetic — real-world reggae/dub soundsystem directory. Game players see they're part of a community, not just a singleplayer experience.
-- The **cadaver exquisito character system** lets player identity feel personal (64 mix-match combinations) without the engineering cost of a full attribute customizer.
+- The **character system** lets the player pick 1 of 6 styles × 2 presentations = 12 variants. Styles: boombap | gfunk | punk | beatmaker | otaku | feline. Presentations: m | f. Each variant is a single transparent PNG at `/assets/sprites/characters/{style}-{presentation}.png` with a 2-tier fallback (presentation 404 → `{style}-m.png` → labelled placeholder rect). State stored in `gameState.data.style` and `gameState.data.presentation`. Feline is an anthropomorphic human-sized cat producer (biped, wears clothing) — visually distinct from the 5 human styles. Future v1.1 will add a user-uploaded character editor.
 - The **2-star Level 1 cap** with system-honest critic framing makes the gatekeeping the joke, not the player's beat. This is on-brand for hip-hop critique culture.
 - The **"Built with SOUND OS" footer link** is the only explicit Sound OS marketing in the game. Everything else is implicit. Show, don't tell.
 
@@ -217,7 +228,7 @@ All in `SOUND OS/04_SOUND_AGENCY/BEATWORLD-APP/`:
 2. Directory "JOIN THE DIRECTORY" form → just show cards
 3. Three.js bloom post-processing → CSS spotlights only
 4. Soundsystem reveal Stage A cinematic → jump to Stage B
-5. CharacterSelect mix-match → single default avatar
+5. CharacterSelect picker → single default avatar (boombap)
 6. Audio samples → synth-only fallback
 7. Performance scene 3D overlay → static dark background
 

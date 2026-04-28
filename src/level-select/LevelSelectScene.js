@@ -7,7 +7,7 @@
  * - Click L1 card → enterCity('new-york')
  */
 import { LEVEL_PROGRESSION } from '../data/LevelProgression.js';
-import { spriteImage, characterPartUrl } from '../ui/SpriteImage.js';
+import { spriteImage, characterImage } from '../ui/SpriteImage.js';
 
 export class LevelSelectScene {
   constructor(gameState, switchScene, enterCity) {
@@ -64,13 +64,8 @@ export class LevelSelectScene {
       z-index:30;
     `;
 
-    const parts = this.gameState.data.characterParts;
-    const composite = document.createElement('div');
-    composite.style.cssText = 'display:flex; flex-direction:column; width:32px; height:96px;';
-    composite.appendChild(spriteImage(characterPartUrl('top', parts.head),    'HEAD',  { width: 32, height: 32 }));
-    composite.appendChild(spriteImage(characterPartUrl('mid', parts.torso),   'TORSO', { width: 32, height: 32 }));
-    composite.appendChild(spriteImage(characterPartUrl('bottom', parts.legs), 'LEGS',  { width: 32, height: 32 }));
-    chip.appendChild(composite);
+    const { style, presentation } = this.gameState.data;
+    chip.appendChild(characterImage(style, presentation, { width: 96, height: 144 }));
 
     const meta = document.createElement('div');
     meta.style.cssText = 'display:flex; flex-direction:column; gap:4px;';

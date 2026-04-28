@@ -49,10 +49,59 @@ export function spriteImage(url, label, { width, height, className = '', style =
 }
 
 /**
- * Returns the URL for one character zone sprite.
- * zone: 'top' | 'mid' | 'bottom'
- * identity: 'boombap' | 'gfunk' | 'punk' | 'beatmaker'
+ * Returns the primary URL for a character sprite.
+ * style:        'boombap' | 'gfunk' | 'punk' | 'beatmaker' | 'otaku' | 'feline'
+ * presentation: 'm' | 'f'
  */
-export function characterPartUrl(zone, identity) {
-  return `/assets/sprites/characters/parts/${zone}-${identity}.png`;
+export function characterUrl(style, presentation = 'm') {
+  return `/assets/sprites/characters/${style}-${presentation}.png`;
+}
+
+/**
+ * Character image with a 2-tier fallback chain so a missing presentation
+ * still renders something useful instead of a placeholder rect:
+ *   1. /assets/sprites/characters/{style}-{presentation}.png
+ *   2. /assets/sprites/characters/{style}-m.png
+ *   3. labelled placeholder rect
+ *
+ * Same return shape as spriteImage(): a wrapper div with fixed dims.
+ */
+export function characterImage(style, presentation, { width, height, className = '', style: cssStyle = '' } = {}) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    width: ${dim(width)}; height: ${dim(height)};
+    display: inline-block; position: relative;
+    ${cssStyle}
+  `;
+  if (className) wrap.className = className;
+
+  const label = `${style.toUpperCase()}-${(presentation || 'm').toUpperCase()}`;
+  const primary = `/assets/sprites/characters/${style}-${presentation}.png`;
+  const fallback = `/assets/sprites/characters/${style}-m.png`;
+
+  const tryImg = (url, onFail) => {
+    const img = new Image();
+    img.src = url;
+    img.style.cssText = 'width:100%; height:100%; display:block; image-rendering:pixelated;';
+    img.alt = label;
+    img.onload = () => { wrap.innerHTML = ''; wrap.appendChild(img); };
+    img.onerror = onFail;
+  };
+
+  tryImg(primary, () => {
+    if (primary === fallback) return renderPlaceholder();
+    tryImg(fallback, renderPlaceholder);
+  });
+
+  function renderPlaceholder() {
+    wrap.innerHTML = '';
+    const ph = document.createElement('div');
+    ph.className = 'sprite-placeholder';
+    ph.style.cssText = 'width:100%; height:100%;';
+    ph.textContent = `[${label}]`;
+    wrap.appendChild(ph);
+    console.warn(`[asset] missing: ${primary} (and fallback ${fallback}) — placeholder rendered`);
+  }
+
+  return wrap;
 }

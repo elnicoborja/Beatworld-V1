@@ -76,35 +76,30 @@ function loadImage(url) {
 }
 
 async function drawCharacter(ctx, gameState) {
-  const parts = gameState.data.characterParts;
-  const x = 110, y = 380, w = 260, h = 390;
+  const style = gameState.data.style || 'boombap';
+  const presentation = gameState.data.presentation || 'm';
+  const x = 110, y = 380, w = 256, h = 384;
 
-  const layers = [
-    { sprite: 'top',    id: parts.head,  label: 'HEAD' },
-    { sprite: 'mid',    id: parts.torso, label: 'TORSO' },
-    { sprite: 'bottom', id: parts.legs,  label: 'LEGS' },
-  ];
-  for (let i = 0; i < layers.length; i++) {
-    const layer = layers[i];
-    const url = `/assets/sprites/characters/parts/${layer.sprite}-${layer.id}.png`;
-    const img = await loadImage(url);
-    const ly = y + i * (h / 3);
-    if (img) {
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, x, ly, w, h / 3);
-    } else {
-      ctx.fillStyle = 'rgba(255,0,255,0.10)';
-      ctx.fillRect(x, ly, w, h / 3);
-      ctx.strokeStyle = '#ff00ff';
-      ctx.setLineDash([6, 6]);
-      ctx.strokeRect(x, ly, w, h / 3);
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#ff00ff';
-      ctx.font = "16px 'Press Start 2P', monospace";
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`[${layer.id.toUpperCase()} ${layer.label}]`, x + w / 2, ly + h / 6);
-    }
+  // 2-tier fallback: {style}-{presentation}.png → {style}-m.png → labelled rect
+  let img = await loadImage(`/assets/sprites/characters/${style}-${presentation}.png`);
+  if (!img && presentation !== 'm') {
+    img = await loadImage(`/assets/sprites/characters/${style}-m.png`);
+  }
+  if (img) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, x, y, w, h);
+  } else {
+    ctx.fillStyle = 'rgba(255,0,255,0.10)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#ff00ff';
+    ctx.setLineDash([6, 6]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ff00ff';
+    ctx.font = "16px 'Press Start 2P', monospace";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`[${style.toUpperCase()}-${presentation.toUpperCase()}]`, x + w / 2, y + h / 2);
   }
 
   // Producer name below
@@ -155,23 +150,43 @@ async function drawBoombox(ctx) {
   ctx.shadowBlur = 0;
 }
 
+function drawHashtag(ctx) {
+  // Top-right corner stamp so the artifact reads as a Vibe Jam entry at a glance.
+  ctx.save();
+  ctx.fillStyle = '#00ddff';
+  ctx.shadowColor = '#00ddff';
+  ctx.shadowBlur = 12;
+  ctx.font = "16px 'Press Start 2P', monospace";
+  ctx.textAlign = 'right';
+  ctx.fillText('#VIBEJAM2026', SIZE - 60, 36);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
 function drawMetadata(ctx, gameState) {
   const cpIdx = gameState.data.audioPrefs.chordProgression || 0;
   const styleName = CHORD_PROGRESSIONS[cpIdx]?.name || 'BOOM BAP';
+  // Level 1 is NYC; this stays static until L2 ships and the share artifact
+  // gets per-level rig art.
+  const region = 'NEW YORK · LEVEL 1';
 
+  // Three-line stack with a visual hierarchy:
+  //   (1) hero claim, big yellow
+  //   (2) style + region, magenta
+  //   (3) source credit + URL, cyan
   const lines = [
-    'PRODUCED IN BEAT WORLD 2.0',
-    `STYLE: ${styleName}`,
-    'BUILT WITH SOUND OS · beatworld.nicoborja.com',
+    { text: 'PRODUCED IN BEAT WORLD',  color: '#ffaa00', size: 22 },
+    { text: `${styleName} · ${region}`, color: '#ff3399', size: 14 },
+    { text: 'BUILT WITH SOUND OS · beatworld.nicoborja.com', color: '#00ddff', size: 14 },
   ];
-  const colors = ['#ffaa00', '#ff3399', '#00ddff'];
   ctx.textAlign = 'center';
   for (let i = 0; i < lines.length; i++) {
-    ctx.fillStyle = colors[i];
-    ctx.shadowColor = colors[i];
+    const ln = lines[i];
+    ctx.fillStyle = ln.color;
+    ctx.shadowColor = ln.color;
     ctx.shadowBlur = 10;
-    ctx.font = `${i === 0 ? 22 : 16}px 'Press Start 2P', monospace`;
-    ctx.fillText(lines[i], SIZE / 2, 850 + i * 56);
+    ctx.font = `${ln.size}px 'Press Start 2P', monospace`;
+    ctx.fillText(ln.text, SIZE / 2, 870 + i * 56);
   }
   ctx.shadowBlur = 0;
 }
@@ -182,6 +197,7 @@ export async function generateShareImage(gameState) {
   const ctx = canvas.getContext('2d');
 
   drawBackground(ctx);
+  drawHashtag(ctx);
   drawWaveform(ctx, gameState);
   await drawCharacter(ctx, gameState);
   await drawBoombox(ctx);

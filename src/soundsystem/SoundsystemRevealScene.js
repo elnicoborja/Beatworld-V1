@@ -140,23 +140,16 @@ export class SoundsystemRevealScene {
     img.onerror = () => bg.appendChild(this._buildHangarPlaceholder());
     stage.appendChild(bg);
 
-    // Header banner
-    const header = document.createElement('div');
-    header.style.cssText = `
-      position:absolute; top:24px; left:0; right:0; text-align:center; z-index:10;
-      font-family:'Press Start 2P', monospace;
-      font-size:18px; color:#ff3399; text-shadow: 0 0 16px #ff3399, 2px 2px 0 #000;
-      letter-spacing:3px; pointer-events:none;
-    `;
-    header.textContent = 'MY SOUND SYSTEM';
-    stage.appendChild(header);
+    // No "MY SOUND SYSTEM" title overlay — the hangar PNG bakes its own title.
 
-    // 6 interactive slot overlays (positioned across the bottom 60% of the screen)
+    // 6 interactive slot overlays (positioned across the bottom 60% of the screen).
+    // align-items:end bottom-anchors every slot to the hangar's painted floor.
     const slots = document.createElement('div');
     slots.style.cssText = `
       position:absolute; bottom:18%; left:0; right:0;
       display:grid; grid-template-columns:repeat(6, 1fr);
       gap:0; z-index:5; padding:0 4%;
+      align-items:end;
     `;
     LEVEL_PROGRESSION.forEach(level => slots.appendChild(this._buildSlot(level)));
     stage.appendChild(slots);
@@ -219,25 +212,32 @@ export class SoundsystemRevealScene {
   _buildSlot(level) {
     const isUnlocked = this.gameState.data.unlockedPieces.includes(level.level);
     const slot = document.createElement('div');
-    slot.style.cssText = `
-      height:140px; cursor:${isUnlocked ? 'default' : 'not-allowed'};
-      position:relative;
-      ${isUnlocked
-        ? `border:2px solid ${level.color}; box-shadow: inset 0 0 24px ${level.color}55, 0 0 18px ${level.color}aa; background:${level.color}11;`
-        : 'border:1px dashed #333; background:rgba(0,0,0,0.2);'}
-    `;
+    if (isUnlocked) {
+      // Tightened to wrap the boombox + pedestal painted in the hangar PNG.
+      // ~11vw × 20vh with px clamps for tiny / huge viewports. Bottom-aligned
+      // to the floor via the grid's align-items:end.
+      slot.style.cssText = `
+        width:11vw; max-width:200px; min-width:80px;
+        height:20vh; max-height:240px; min-height:120px;
+        margin:0 auto; cursor:default; position:relative;
+        border:2px solid ${level.color};
+        box-shadow: inset 0 0 18px ${level.color}55, 0 0 16px ${level.color}aa;
+        background:${level.color}11;
+      `;
+    } else {
+      slot.style.cssText = `
+        height:140px; cursor:not-allowed; position:relative;
+        border:1px dashed #333; background:rgba(0,0,0,0.2);
+      `;
+    }
     const tip = isUnlocked
       ? `L${level.level} · ${level.region} · ${level.piece} ✓ — BUILT FROM YOUR FIRST BEAT`
       : `L${level.level} · ${level.region} · ${level.piece} 🔒 — UNLOCK BY COMPLETING LEVEL ${level.level - 1}`;
     slot.title = tip;
 
     if (isUnlocked) {
-      slot.appendChild(spriteImage(
-        level.pieceSprite,
-        level.piece,
-        { width: '100%', height: '100%', style: 'object-fit:contain;' }
-      ));
-      // Pulsing border via animation
+      // No piece-sprite overlay — the hangar PNG bakes its own boombox in slot 1.
+      // The magenta border + pulsing brightness are the unlocked affordance.
       slot.style.animation = 'slot-pulse 1.6s ease-in-out infinite alternate';
       if (!document.getElementById('ss-pulse-kf')) {
         const style = document.createElement('style');
