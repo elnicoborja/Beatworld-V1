@@ -220,32 +220,18 @@ export class SoundsystemRevealScene {
     const isUnlocked = this.gameState.data.unlockedPieces.includes(level.level);
     const slot = document.createElement('div');
     slot.style.cssText = `
-      height:140px; cursor:${isUnlocked ? 'default' : 'not-allowed'};
+      height:140px;
       position:relative;
-      ${isUnlocked
-        ? `border:2px solid ${level.color}; box-shadow: inset 0 0 24px ${level.color}55, 0 0 18px ${level.color}aa; background:${level.color}11;`
-        : 'border:1px dashed #333; background:rgba(0,0,0,0.2);'}
+      cursor:help;
+      background:transparent;
+      border:none;
+      box-shadow:none;
+      animation:none;
     `;
     const tip = isUnlocked
       ? `L${level.level} · ${level.region} · ${level.piece} ✓ — BUILT FROM YOUR FIRST BEAT`
       : `L${level.level} · ${level.region} · ${level.piece} 🔒 — UNLOCK BY COMPLETING LEVEL ${level.level - 1}`;
     slot.title = tip;
-
-    if (isUnlocked) {
-      slot.appendChild(spriteImage(
-        level.pieceSprite,
-        level.piece,
-        { width: '100%', height: '100%', style: 'object-fit:contain;' }
-      ));
-      // Pulsing border via animation
-      slot.style.animation = 'slot-pulse 1.6s ease-in-out infinite alternate';
-      if (!document.getElementById('ss-pulse-kf')) {
-        const style = document.createElement('style');
-        style.id = 'ss-pulse-kf';
-        style.textContent = `@keyframes slot-pulse { from { filter: brightness(1); } to { filter: brightness(1.3); } }`;
-        document.head.appendChild(style);
-      }
-    }
     return slot;
   }
 
