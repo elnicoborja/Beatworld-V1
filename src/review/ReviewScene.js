@@ -153,9 +153,7 @@ export class ReviewScene {
     };
     coverBg.appendChild(coverImg);
 
-    // Filled-stars overlay (positioned over the cover's empty star row)
-    const starsOverlay = this._buildStarsOverlay(rating, cfg);
-    coverBg.appendChild(starsOverlay);
+    // (Star overlay removed — rating is shown in the score panel below.)
     this.el.appendChild(coverBg);
 
     // ── Critic comment box (bottom-left) ─────────────────────

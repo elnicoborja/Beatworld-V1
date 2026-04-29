@@ -1,25 +1,14 @@
 /**
- * CharacterSelectScene — pick 1 of 6 styles × 2 presentations.
- *
- * Style cycle: boombap → gfunk → punk → beatmaker → otaku → feline → (loops)
- * Presentation pills: [ M ] [ F ]
- * 12 visual variants total. Style + presentation save immediately so
- * a refresh mid-customize is preserved. Name commits only on ENTER WORLD.
- *
- * TODO v1.1: replace fixed-style picker with user-uploaded character editor.
- * Spec: drag-drop a 256x384 transparent PNG, validate dimensions,
- * store in localStorage as base64, render directly.
+ * CharacterSelectScene — pick 1 of 6 styles × 2 presentations + name + city.
+ * City uses OpenStreetMap Nominatim live autocomplete (free, no API key,
+ * structured place data with lat/lon).
  */
 import { characterImage } from '../ui/SpriteImage.js';
 
 const STYLES = ['boombap', 'gfunk', 'punk', 'beatmaker', 'otaku', 'feline'];
 const STYLE_LABELS = {
-  boombap: 'BOOMBAP',
-  gfunk: 'G-FUNK',
-  punk: 'PUNK',
-  beatmaker: 'BEATMAKER',
-  otaku: 'OTAKU',
-  feline: 'FELINE',
+  boombap: 'BOOMBAP', gfunk: 'G-FUNK', punk: 'PUNK',
+  beatmaker: 'BEATMAKER', otaku: 'OTAKU', feline: 'FELINE',
 };
 const PRESENTATIONS = ['m', 'f'];
 const PRESENTATION_LABELS = { m: 'M', f: 'F' };
@@ -54,14 +43,9 @@ export class CharacterSelectScene {
     subtitle.textContent = 'PICK YOUR CHARACTER';
     body.appendChild(subtitle);
 
-    // Live preview
     this.previewWrap = this._buildPreview();
     body.appendChild(this.previewWrap);
-
-    // Style cycle row: ◀ STYLE_NAME ▶
     body.appendChild(this._buildStyleRow());
-
-    // Presentation pills: [ M ]  [ F ]
     body.appendChild(this._buildPresentationRow());
 
     // Name input
@@ -83,33 +67,33 @@ export class CharacterSelectScene {
     `;
     body.appendChild(nameWrap);
 
-    // City input — free-text + a verify-on-Google-Maps preview link.
-    // Stored as gameState.playerCity; used in producer card, mailto bodies,
-    // and a future Klaviyo profile when newsletter wiring lands.
+    // City input — Nominatim autocomplete dropdown
     const cityWrap = document.createElement('div');
-    cityWrap.style.cssText = 'display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:8px;';
+    cityWrap.style.cssText = 'display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:8px; position:relative;';
     const currentCity = this.gameState.data.playerCity || '';
     cityWrap.innerHTML = `
       <label style="font-size:8px; color:#888; letter-spacing:1px;">YOUR CITY (OPTIONAL)</label>
-      <input id="cs-city" type="text" maxlength="60" autocomplete="address-level2" spellcheck="false"
-        value="${currentCity.replace(/"/g, '&quot;')}"
-        placeholder="E.G. BOGOTÁ, COLOMBIA"
-        style="
+      <div style="position:relative; width:280px;">
+        <input id="cs-city" type="text" maxlength="80" autocomplete="off" spellcheck="false"
+          value="${currentCity.replace(/"/g, '&quot;')}"
+          placeholder="START TYPING — E.G. BOGOTÁ"
+          style="
+            font-family:'Press Start 2P', monospace;
+            font-size:9px; padding:8px 12px;
+            background:#0a0a1e; color:#00ddff;
+            border:2px solid #00ddff; text-align:center;
+            text-transform:uppercase; width:100%; box-sizing:border-box;
+            letter-spacing:1px; outline:none;
+          " />
+        <div id="cs-city-results" style="
+          position:absolute; top:100%; left:0; right:0;
+          margin-top:2px; max-height:200px; overflow-y:auto;
+          background:#0a0a1e; border:2px solid #00ddff;
+          z-index:100; display:none;
           font-family:'Press Start 2P', monospace;
-          font-size:9px; padding:8px 12px;
-          background:#0a0a1e; color:#00ddff;
-          border:2px solid #00ddff; text-align:center;
-          text-transform:uppercase; width:280px;
-          letter-spacing:1px; outline:none;
-        " />
-      <a id="cs-city-verify" target="_blank" rel="noopener"
-         style="
-           font-size:6px; color:#888; letter-spacing:1px;
-           text-decoration:underline; cursor:pointer;
-           ${currentCity ? '' : 'visibility:hidden;'}
-         ">
-        VERIFY ON GOOGLE MAPS ↗
-      </a>
+        "></div>
+      </div>
+      <div id="cs-city-status" style="font-size:6px; color:#666; letter-spacing:1px; min-height:9px;"></div>
     `;
     body.appendChild(cityWrap);
 
@@ -124,18 +108,74 @@ export class CharacterSelectScene {
 
     const nameInput = body.querySelector('#cs-name');
     const cityInput = body.querySelector('#cs-city');
-    const cityVerify = body.querySelector('#cs-city-verify');
-    const updateVerifyLink = () => {
-      const v = (cityInput.value || '').trim();
-      if (v) {
-        cityVerify.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`;
-        cityVerify.style.visibility = 'visible';
-      } else {
-        cityVerify.style.visibility = 'hidden';
+    const cityResults = body.querySelector('#cs-city-results');
+    const cityStatus = body.querySelector('#cs-city-status');
+    let cityFetchTimer = null;
+    let selectedPlace = null;
+
+    const renderResults = (places) => {
+      cityResults.innerHTML = '';
+      if (!places || !places.length) {
+        cityResults.style.display = 'none';
+        cityStatus.textContent = 'NO MATCHES — TYPE FREELY';
+        cityStatus.style.color = '#888';
+        return;
       }
+      places.slice(0, 5).forEach(p => {
+        const row = document.createElement('div');
+        row.style.cssText = `
+          padding:8px 10px; cursor:pointer;
+          font-size:8px; color:#fff; line-height:1.5;
+          border-bottom:1px solid #1a1a3e;
+        `;
+        row.textContent = p.display_name;
+        row.addEventListener('mouseenter', () => { row.style.background = '#1a1a3e'; });
+        row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+        row.addEventListener('click', () => {
+          cityInput.value = p.display_name;
+          selectedPlace = { displayName: p.display_name, lat: parseFloat(p.lat), lon: parseFloat(p.lon), placeId: p.place_id };
+          cityResults.style.display = 'none';
+          cityStatus.textContent = `✓ ${p.display_name.slice(0, 40)}${p.display_name.length > 40 ? '…' : ''}`;
+          cityStatus.style.color = '#00cc44';
+        });
+        cityResults.appendChild(row);
+      });
+      cityResults.style.display = 'block';
+      cityStatus.textContent = '';
     };
-    updateVerifyLink();
-    cityInput.addEventListener('input', updateVerifyLink);
+
+    const fetchCitySuggestions = (q) => {
+      cityStatus.textContent = 'SEARCHING…';
+      cityStatus.style.color = '#888';
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=0`, {
+        headers: { 'Accept': 'application/json' },
+      })
+        .then(r => r.json())
+        .then(renderResults)
+        .catch(() => {
+          cityStatus.textContent = '⚠ COULD NOT REACH MAPS — TYPE FREELY';
+          cityStatus.style.color = '#ffaa00';
+        });
+    };
+
+    cityInput.addEventListener('input', () => {
+      selectedPlace = null;
+      const q = (cityInput.value || '').trim();
+      if (cityFetchTimer) clearTimeout(cityFetchTimer);
+      if (q.length < 3) {
+        cityResults.style.display = 'none';
+        cityStatus.textContent = '';
+        return;
+      }
+      cityFetchTimer = setTimeout(() => fetchCitySuggestions(q), 350);
+    });
+    cityInput.addEventListener('focus', () => {
+      if (cityResults.children.length) cityResults.style.display = 'block';
+    });
+    cityInput.addEventListener('blur', () => {
+      setTimeout(() => { cityResults.style.display = 'none'; }, 200);
+    });
+
     nameInput.addEventListener('input', () => { nameInput.style.borderColor = '#ffaa00'; });
     nameInput.focus();
     nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') cityInput.focus(); });
@@ -150,6 +190,7 @@ export class CharacterSelectScene {
       }
       this.gameState.setPlayerName(name);
       this.gameState.setPlayerCity(cityInput.value || '');
+      if (selectedPlace) this.gameState.setPlayerCityData(selectedPlace);
       this.switchScene('levelSelect');
     });
   }
@@ -162,13 +203,11 @@ export class CharacterSelectScene {
   _buildStyleRow() {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex; align-items:center; gap:14px; margin-top:6px;';
-
     const leftBtn = document.createElement('button');
     leftBtn.className = 'pixel-btn cyan';
     leftBtn.style.cssText = 'padding:10px 14px; font-size:12px;';
     leftBtn.textContent = '◀';
     row.appendChild(leftBtn);
-
     this.styleLabel = document.createElement('div');
     this.styleLabel.style.cssText = `
       min-width:180px; text-align:center;
@@ -177,13 +216,11 @@ export class CharacterSelectScene {
     `;
     this.styleLabel.textContent = STYLE_LABELS[this.gameState.data.style];
     row.appendChild(this.styleLabel);
-
     const rightBtn = document.createElement('button');
     rightBtn.className = 'pixel-btn cyan';
     rightBtn.style.cssText = 'padding:10px 14px; font-size:12px;';
     rightBtn.textContent = '▶';
     row.appendChild(rightBtn);
-
     leftBtn.addEventListener('click', () => this._cycleStyle(-1));
     rightBtn.addEventListener('click', () => this._cycleStyle(+1));
     return row;
@@ -191,7 +228,6 @@ export class CharacterSelectScene {
 
   _buildPresentationRow() {
     const row = document.createElement('div');
-    // Slightly larger gap between the two pills (was 14px on the style row, 28px here)
     row.style.cssText = 'display:flex; align-items:center; gap:28px; margin-top:4px;';
     this.presentationButtons = {};
     PRESENTATIONS.forEach(p => {
