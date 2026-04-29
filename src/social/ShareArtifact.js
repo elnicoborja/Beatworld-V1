@@ -1,69 +1,25 @@
 /**
- * ShareArtifact — composes a 1080×1080 PNG of the player's beat + rig
- * suitable for X / Instagram. Triggers a download + opens the share intent.
+ * ShareArtifact — composes a 1080×1080 PNG of the player IN the unlock scene.
  *
- * Composition (from top):
- *   - 0-360px: stylized waveform derived from the beat grid
- *   - 360-720px: character composite (left) + boombox sprite (right)
- *   - 720-1080px: metadata strip
+ * Composition:
+ *   - Background: the unlock cinematic for the player's most recently
+ *     completed level (boombox-unlock-coney-island.png for L1, pico-unlock-vieques.png
+ *     for L2, etc), centered-cropped from 1920x1080 → 1080x1080.
+ *   - Foreground: the player's character standing in front of the soundsystem
+ *     piece. The unlock image already contains the rig, so the character just
+ *     needs to land on the visual baseline.
+ *   - Bottom strip: BEAT NAME (large) + beatworld.nicoborja.com (small).
+ *     Nothing else. The content is the brand.
  */
-import { CHORD_PROGRESSIONS } from '../studio/AudioEngine.js';
+import { CITIES } from '../GameData.js';
 
 const SIZE = 1080;
 
-function dim(v, def = 0) { return (typeof v === 'number' && !isNaN(v)) ? v : def; }
-
-function drawBackground(ctx) {
-  // Base
-  ctx.fillStyle = '#0a0a1e';
-  ctx.fillRect(0, 0, SIZE, SIZE);
-
-  // Magenta-cyan radial gradient
-  const grad = ctx.createRadialGradient(SIZE * 0.5, SIZE * 0.5, 50, SIZE * 0.5, SIZE * 0.5, SIZE * 0.7);
-  grad.addColorStop(0, 'rgba(255,51,153,0.25)');
-  grad.addColorStop(0.6, 'rgba(0,221,255,0.10)');
-  grad.addColorStop(1, 'rgba(10,10,30,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, SIZE, SIZE);
-
-  // Faint CRT scanlines
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  for (let y = 0; y < SIZE; y += 4) {
-    ctx.fillRect(0, y, SIZE, 1);
-  }
-}
-
-function drawWaveform(ctx, gameState) {
-  const cityId = gameState.data.currentCity || 'new-york';
-  const grid = gameState.data.tracks[cityId] || [];
-  const steps = grid[0]?.length || 16;
-
-  const x0 = 60, y0 = 60, w = SIZE - 120, h = 240;
-
-  // Backdrop card
-  ctx.strokeStyle = 'rgba(255,51,153,0.6)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x0, y0, w, h);
-
-  // 64 bars derived from grid density per slice
-  const bars = 64;
-  const barW = w / bars;
-  for (let i = 0; i < bars; i++) {
-    // Map bar i to step range
-    const stepIdx = Math.floor((i / bars) * steps);
-    let active = 0;
-    for (let t = 0; t < grid.length; t++) {
-      if (grid[t]?.[stepIdx]) active++;
-    }
-    const intensity = grid.length ? (active / grid.length) : 0;
-    // Random-ish vertical jitter so even empty grids look like a waveform
-    const seed = Math.sin(i * 1.7 + 0.3) * 0.5 + 0.5;
-    const barH = (intensity * 0.7 + seed * 0.3) * h * 0.85;
-    const colorMix = i % 2 === 0 ? '#ff3399' : '#00ddff';
-    ctx.fillStyle = colorMix;
-    ctx.fillRect(x0 + i * barW + 1, y0 + h / 2 - barH / 2, Math.max(1, barW - 2), barH);
-  }
-}
+// Per-level cinematic background. Falls back to L1 if the city isn't mapped.
+const UNLOCK_BG_BY_CITY = {
+  'new-york':    '/assets/sprites/soundsystem/boombox-unlock-coney-island.png',
+  'puerto-rico': '/assets/sprites/soundsystem/pico-unlock-vieques.png',
+};
 
 function loadImage(url) {
   return new Promise((resolve) => {
@@ -75,10 +31,49 @@ function loadImage(url) {
   });
 }
 
+/**
+ * Center-crop a wide image into a square fill. Source dims are typically
+ * 1920×1080; we keep the vertical extent and crop the horizontal sides
+ * symmetrically so the soundsystem (typically center-foreground) stays
+ * intact. Pixel-art smoothing is disabled so edges stay crisp.
+ */
+function drawSquareCrop(ctx, img) {
+  if (!img) return;
+  ctx.imageSmoothingEnabled = false;
+  const sw = img.naturalWidth, sh = img.naturalHeight;
+  if (!sw || !sh) return;
+  // Cover-fit: scale so the source fills SIZE×SIZE; crop overflow centrally.
+  const scale = Math.max(SIZE / sw, SIZE / sh);
+  const dw = sw * scale, dh = sh * scale;
+  const dx = (SIZE - dw) / 2, dy = (SIZE - dh) / 2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
+function drawFallbackBg(ctx, cityName) {
+  // Solid navy + radial accent so a missing background doesn't bleach to black.
+  ctx.fillStyle = '#0a0a1e';
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  const grad = ctx.createRadialGradient(SIZE * 0.5, SIZE * 0.55, 50, SIZE * 0.5, SIZE * 0.55, SIZE * 0.7);
+  grad.addColorStop(0, 'rgba(255,51,153,0.30)');
+  grad.addColorStop(0.6, 'rgba(0,221,255,0.10)');
+  grad.addColorStop(1, 'rgba(10,10,30,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  ctx.fillStyle = '#666';
+  ctx.font = "16px 'Press Start 2P', monospace";
+  ctx.textAlign = 'center';
+  ctx.fillText(`[UNLOCK SCENE — ${cityName?.toUpperCase() || 'CITY'}]`, SIZE / 2, SIZE * 0.45);
+}
+
 async function drawCharacter(ctx, gameState) {
+  // Character placed at lower-center, scaled large so they read as standing
+  // in front of the soundsystem. 360w × 540h slot, baseline near canvas-bottom.
   const style = gameState.data.style || 'boombap';
   const presentation = gameState.data.presentation || 'm';
-  const x = 110, y = 380, w = 256, h = 384;
+  const w = 360, h = 540;
+  const x = (SIZE - w) / 2;
+  const y = SIZE - h - 110; // 110px padding above the bottom strip
 
   // 2-tier fallback: {style}-{presentation}.png → {style}-m.png → labelled rect
   let img = await loadImage(`/assets/sprites/characters/${style}-${presentation}.png`);
@@ -89,105 +84,44 @@ async function drawCharacter(ctx, gameState) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, x, y, w, h);
   } else {
-    ctx.fillStyle = 'rgba(255,0,255,0.10)';
+    // Subtle dashed outline only — no big "CHARACTER MISSING" graphic.
+    ctx.fillStyle = 'rgba(255,170,0,0.08)';
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#ff00ff';
+    ctx.strokeStyle = '#ffaa00';
     ctx.setLineDash([6, 6]);
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
-    ctx.fillStyle = '#ff00ff';
-    ctx.font = "16px 'Press Start 2P', monospace";
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`[${style.toUpperCase()}-${presentation.toUpperCase()}]`, x + w / 2, y + h / 2);
   }
+}
 
-  // Producer name below
+function drawBottomStrip(ctx, gameState) {
+  // Strict minimal: BEAT NAME (large) + URL (small). No "BUILT WITH", no
+  // "PRODUCED IN", no hashtag stamp. Content is the brand.
+  const cityId = gameState.data.currentCity || 'new-york';
+  const beat = (gameState.getBeat ? gameState.getBeat(cityId) : null) ||
+               { beatName: 'UNTITLED BEAT' };
+  const beatName = (beat.beatName || 'UNTITLED BEAT').slice(0, 24);
+
+  // Dark band at the very bottom to anchor text against busy backgrounds.
+  ctx.fillStyle = 'rgba(10, 10, 30, 0.78)';
+  ctx.fillRect(0, SIZE - 96, SIZE, 96);
+
+  ctx.textAlign = 'center';
+
+  // Beat name
   ctx.fillStyle = '#ffaa00';
   ctx.shadowColor = '#ffaa00';
-  ctx.shadowBlur = 12;
-  ctx.font = "20px 'Press Start 2P', monospace";
-  ctx.textAlign = 'center';
-  ctx.fillText(gameState.data.playerName || 'PRODUCER', x + w / 2, y + h + 36);
-  ctx.shadowBlur = 0;
-}
+  ctx.shadowBlur = 14;
+  ctx.font = "28px 'Press Start 2P', monospace";
+  ctx.fillText(beatName, SIZE / 2, SIZE - 52);
 
-async function drawBoombox(ctx) {
-  const x = SIZE - 110 - 260, y = 420, w = 260, h = 260;
-
-  // Magenta halo behind
-  const halo = ctx.createRadialGradient(x + w / 2, y + h / 2, 20, x + w / 2, y + h / 2, w * 0.7);
-  halo.addColorStop(0, 'rgba(255,51,153,0.7)');
-  halo.addColorStop(1, 'rgba(255,51,153,0)');
-  ctx.fillStyle = halo;
-  ctx.fillRect(x - 40, y - 40, w + 80, h + 80);
-
-  const img = await loadImage('/assets/sprites/soundsystem/boombox.png');
-  if (img) {
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, x, y, w, h);
-  } else {
-    ctx.fillStyle = 'rgba(255,0,255,0.10)';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#ff00ff';
-    ctx.setLineDash([6, 6]);
-    ctx.strokeRect(x, y, w, h);
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#ff00ff';
-    ctx.font = "20px 'Press Start 2P', monospace";
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('[BOOMBOX]', x + w / 2, y + h / 2);
-  }
-
-  // Label
+  // URL
   ctx.fillStyle = '#00ddff';
   ctx.shadowColor = '#00ddff';
-  ctx.shadowBlur = 10;
-  ctx.font = "16px 'Press Start 2P', monospace";
-  ctx.textAlign = 'center';
-  ctx.fillText('MY SOUND SYSTEM', x + w / 2, y + h + 36);
-  ctx.shadowBlur = 0;
-}
+  ctx.shadowBlur = 8;
+  ctx.font = "14px 'Press Start 2P', monospace";
+  ctx.fillText('beatworld.nicoborja.com', SIZE / 2, SIZE - 22);
 
-function drawHashtag(ctx) {
-  // Top-right corner stamp so the artifact reads as a Vibe Jam entry at a glance.
-  ctx.save();
-  ctx.fillStyle = '#00ddff';
-  ctx.shadowColor = '#00ddff';
-  ctx.shadowBlur = 12;
-  ctx.font = "16px 'Press Start 2P', monospace";
-  ctx.textAlign = 'right';
-  ctx.fillText('#VIBEJAM2026', SIZE - 60, 36);
-  ctx.shadowBlur = 0;
-  ctx.restore();
-}
-
-function drawMetadata(ctx, gameState) {
-  const cpIdx = gameState.data.audioPrefs.chordProgression || 0;
-  const styleName = CHORD_PROGRESSIONS[cpIdx]?.name || 'BOOM BAP';
-  // Level 1 is NYC; this stays static until L2 ships and the share artifact
-  // gets per-level rig art.
-  const region = 'NEW YORK · LEVEL 1';
-
-  // Three-line stack with a visual hierarchy:
-  //   (1) hero claim, big yellow
-  //   (2) style + region, magenta
-  //   (3) source credit + URL, cyan
-  const lines = [
-    { text: 'PRODUCED IN BEAT WORLD',  color: '#ffaa00', size: 22 },
-    { text: `${styleName} · ${region}`, color: '#ff3399', size: 14 },
-    { text: 'BUILT WITH SOUND OS · beatworld.nicoborja.com', color: '#00ddff', size: 14 },
-  ];
-  ctx.textAlign = 'center';
-  for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i];
-    ctx.fillStyle = ln.color;
-    ctx.shadowColor = ln.color;
-    ctx.shadowBlur = 10;
-    ctx.font = `${ln.size}px 'Press Start 2P', monospace`;
-    ctx.fillText(ln.text, SIZE / 2, 870 + i * 56);
-  }
   ctx.shadowBlur = 0;
 }
 
@@ -196,12 +130,20 @@ export async function generateShareImage(gameState) {
   canvas.width = SIZE; canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
 
-  drawBackground(ctx);
-  drawHashtag(ctx);
-  drawWaveform(ctx, gameState);
+  // Pick the unlock cinematic for the player's current/most-recent city.
+  const cityId = gameState.data.currentCity || 'new-york';
+  const cityName = CITIES[cityId]?.name;
+  const bgUrl = UNLOCK_BG_BY_CITY[cityId] || UNLOCK_BG_BY_CITY['new-york'];
+  const bgImg = await loadImage(bgUrl);
+
+  if (bgImg) {
+    drawSquareCrop(ctx, bgImg);
+  } else {
+    drawFallbackBg(ctx, cityName);
+  }
+
   await drawCharacter(ctx, gameState);
-  await drawBoombox(ctx);
-  drawMetadata(ctx, gameState);
+  drawBottomStrip(ctx, gameState);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
@@ -224,11 +166,10 @@ export async function generateAndDownloadShareImage(gameState) {
   a.remove();
 
   // 2) Show share modal with X + IG instructions
-  _openShareModal(url);
+  _openShareModal(url, gameState);
 }
 
-function _openShareModal(blobUrl) {
-  // Remove any existing modal
+function _openShareModal(blobUrl, gameState) {
   document.getElementById('share-modal')?.remove();
 
   const modal = document.createElement('div');
@@ -239,7 +180,11 @@ function _openShareModal(blobUrl) {
     font-family:'Press Start 2P', monospace;
   `;
 
-  const tweetText = encodeURIComponent('I built a boombox in Beat World 🔊 Make yours at beatworld.nicoborja.com #VibeJam2026');
+  const cityId = gameState?.data?.currentCity || 'new-york';
+  const beat = (gameState?.getBeat ? gameState.getBeat(cityId) : null) || { beatName: 'UNTITLED BEAT' };
+  const beatName = (beat.beatName || 'UNTITLED BEAT');
+
+  const tweetText = encodeURIComponent(`"${beatName}" — built it on beatworld.nicoborja.com 🔊 #VibeJam2026`);
   const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
 
   modal.innerHTML = `

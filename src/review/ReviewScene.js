@@ -1,5 +1,5 @@
 /**
- * ReviewScene — XXL Mag review with Level-1 2-star cap.
+ * ReviewScene — COMPLEX magazine review with Level-1 2-star cap.
  *
  * Locked design (2026-04-27 PM):
  *   - L1 reviews cap at 2 stars regardless of beat quality.
@@ -14,20 +14,67 @@ import { spriteImage } from '../ui/SpriteImage.js';
 import { mountSoundOsFooter } from '../ui/SoundOsFooter.js';
 import { CITIES } from '../GameData.js';
 
-const REVIEWS_LEVEL_1 = {
-  1: [
-    "WHACK. WELCOME TO NYC, KID.",
-    "MID. THIS IS WHY YOU DON'T QUIT YOUR DAY JOB.",
-    "FIRST BEATS ALWAYS HIT LIKE THIS. KEEP COOKING.",
-  ],
-  2: [
-    "RESPECT — YOU FOUND THE POCKET. BUT IT'S STILL NYC. EARN YOUR THIRD STAR ELSEWHERE.",
-    "THIS WOULD GO IN MIAMI. NOT HERE. NOT YET.",
-    "DECENT FIRST TRY. NOBODY GETS PAST 2 STARS IN THE BRONX.",
-  ],
+// Per-level review experience. Each city gets its own magazine + critic combo
+// so the cultural arc lines up: NYC → XXXS / Charlamagne, PR → CORNPLEX / Young Miko.
+// L3+ (Brazil, Andean, Mexico, Jamaica) post-launch — keys are placeholders.
+const REVIEW_BY_CITY = {
+  'new-york': {
+    magazineLabel: 'XXXS',
+    coverPath:     '/assets/sprites/ui/review-magazine-cover-xxxs.png',
+    coverAltText:  'MAGAZINE COVER — XXXS',
+    criticPath:    '/assets/sprites/characters/critic-xxxs.png',
+    criticName:    'CHARLAMAGNE',
+    outletDisplay: 'CHARLAMAGNE · XXXS',
+    starCap:       2,           // L1 caps at 2 stars regardless of beat quality
+    reviews: {
+      1: [
+        "WHACK. WELCOME TO NYC, KID.",
+        "MID. THIS IS WHY YOU DON'T QUIT YOUR DAY JOB.",
+        "FIRST BEATS ALWAYS HIT LIKE THIS. KEEP COOKING.",
+      ],
+      2: [
+        "RESPECT — YOU FOUND THE POCKET. BUT IT'S STILL NYC. EARN YOUR THIRD STAR ELSEWHERE.",
+        "THIS WOULD GO IN MIAMI. NOT HERE. NOT YET.",
+        "DECENT FIRST TRY. NOBODY GETS PAST 2 STARS IN THE BRONX.",
+      ],
+    },
+  },
+  'puerto-rico': {
+    magazineLabel: 'CORNPLEX',
+    coverPath:     '/assets/sprites/ui/review-magazine-cover-cornplex.png',
+    coverAltText:  'MAGAZINE COVER — CORNPLEX',
+    criticPath:    '/assets/sprites/characters/critic-cornplex.png',
+    criticName:    'YOUNG MIKO',
+    outletDisplay: 'YOUNG MIKO · CORNPLEX',
+    starCap:       3,           // L2 lets player up to 3 stars
+    reviews: {
+      1: [
+        "NO ESTÁ MAL — PERO TIENES QUE PERREAR MÁS DURO.",
+        "ESTO NO ES DEMBOW, MAMI. ESTO ES TAREA.",
+        "PRIMERA VEZ EN LA ISLA. SE NOTA.",
+      ],
+      2: [
+        "ESO YA ES PERREO. CON CONFIANZA. SIGUE.",
+        "TIENE LO SUYO. PERO TODAVÍA NO ES UN HIT.",
+        "EL SAN JUAN PIANO TE SALVÓ. ÚSALO MÁS.",
+      ],
+      3: [
+        "FIRMA UN PERREO INTENSO. ESTO SE QUEDA EN EL PICÓ.",
+        "ESO ES OTRA COSA. EL BLOQUE ENTERO TE OYE.",
+        "PASASTE LA PRUEBA DE LA CALLE. RESPETO.",
+      ],
+    },
+  },
 };
 
-function computeRatingLevel1(grid) {
+// Fallback for any cityId that doesn't have a configured review experience yet.
+const FALLBACK_REVIEW = REVIEW_BY_CITY['new-york'];
+
+/**
+ * Rate the beat using grid density + downbeat hit-rate. Capped per level.
+ * starCap = 2 for L1 (NYC), 3 for L2 (PR), open for later levels.
+ */
+function computeRating(grid, starCap = 2) {
   if (!grid || !grid.length || !grid[0]) return 1;
   const totalCells = grid.length * grid[0].length;
   const activeCells = grid.flat().filter(Boolean).length;
@@ -42,7 +89,7 @@ function computeRatingLevel1(grid) {
   const downbeatScore = downbeatHits / (grid.length * (grid[0].length / 4));
   const score = density * 0.5 + downbeatScore * 0.5;
   const raw = Math.max(1, Math.min(5, Math.ceil(score * 5)));
-  return Math.min(2, raw); // Level 1 cap
+  return Math.min(starCap, raw);
 }
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -56,15 +103,23 @@ export class ReviewScene {
 
   show() {
     const cityId = this.gameState.data.currentCity || 'new-york';
-    const grid = this.gameState.data.tracks[cityId] || [];
-    const rating = computeRatingLevel1(grid);
-    const reviewText = pick(REVIEWS_LEVEL_1[rating] || REVIEWS_LEVEL_1[1]);
+    const beat = this.gameState.getBeat(cityId);
+    const grid = beat?.grid || [];
+    const cfg = REVIEW_BY_CITY[cityId] || FALLBACK_REVIEW;
+    const rating = computeRating(grid, cfg.starCap || 2);
+    const reviewText = pick(cfg.reviews[rating] || cfg.reviews[1] || []);
     const cloutReward = rating * 25;
+
+    // Persist the rating back onto the BeatRecord so the share card and
+    // the directory producer card can show it later.
+    this.gameState.setBeatRating(cityId, rating);
 
     // Award clout + mark level done. completeLevel + unlock are idempotent.
     this.gameState.addClout(cloutReward);
-    this.gameState.completeLevel(1);
-    this.gameState.unlockSoundsystemPiece(1);
+    // Level 1 is always 1; future levels should map cityId → level.
+    const levelForCity = cityId === 'puerto-rico' ? 2 : 1;
+    this.gameState.completeLevel(levelForCity);
+    this.gameState.unlockSoundsystemPiece(levelForCity);
 
     const container = document.getElementById('screen-container');
     this.el = document.createElement('div');
@@ -84,20 +139,20 @@ export class ReviewScene {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; justify-content:center;';
 
-    // Magazine cover with star overlay
-    row.appendChild(this._buildCoverWithStars(rating));
+    // Magazine cover with star overlay (per-level)
+    row.appendChild(this._buildCoverWithStars(rating, cfg));
 
-    // Critic column
+    // Critic column (per-level)
     const criticCol = document.createElement('div');
     criticCol.style.cssText = 'display:flex; flex-direction:column; align-items:center; gap:10px; min-width:256px;';
     criticCol.appendChild(spriteImage(
-      '/assets/sprites/characters/critic-xxl.png',
+      cfg.criticPath,
       'CRITIC PORTRAIT',
       { width: 200, height: 200, style: 'filter: drop-shadow(0 0 12px #ff3399);' }
     ));
     const outlet = document.createElement('div');
     outlet.style.cssText = 'font-size:9px; color:#00ddff; letter-spacing:2px; text-align:center;';
-    outlet.textContent = 'DJ XXL · XXL MAG';
+    outlet.textContent = cfg.outletDisplay;
     criticCol.appendChild(outlet);
 
     const reviewBox = document.createElement('div');
@@ -133,7 +188,9 @@ export class ReviewScene {
       font-size:7px; color:#888; font-style:italic; text-align:center;
       max-width:520px; line-height:1.6; padding:0 16px;
     `;
-    honesty.textContent = "EVEN THE GREATEST DON'T GET MORE THAN 2 STARS IN NYC. EARN YOUR REPUTATION.";
+    honesty.textContent = cityId === 'puerto-rico'
+      ? "TRES ESTRELLAS ES EL TECHO EN LA ISLA. EL CUARTO LO GANAS EN EL PRÓXIMO BLOQUE."
+      : "EVEN THE GREATEST DON'T GET MORE THAN 2 STARS IN NYC. EARN YOUR REPUTATION.";
     body.appendChild(honesty);
 
     // ── Action buttons ───────────────────────────────────────
@@ -162,7 +219,6 @@ export class ReviewScene {
     this.el.appendChild(body);
     container.appendChild(this.el);
 
-    // pulse keyframes — inject once
     if (!document.getElementById('rev-pulse-kf')) {
       const style = document.createElement('style');
       style.id = 'rev-pulse-kf';
@@ -178,17 +234,14 @@ export class ReviewScene {
     mountSoundOsFooter(this.el);
   }
 
-  _buildCoverWithStars(rating) {
+  _buildCoverWithStars(rating, cfg) {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:relative; width:280px; height:350px;';
-    // Cover image (or placeholder)
     wrap.appendChild(spriteImage(
-      '/assets/sprites/ui/review-magazine-cover.png',
-      'MAGAZINE COVER — XXL MAG',
+      cfg.coverPath,
+      cfg.coverAltText,
       { width: 280, height: 350 }
     ));
-    // Star overlay row — positioned roughly where the cover template's empty-star row sits.
-    // When the real cover ships, fine-tune top/left to match.
     const stars = document.createElement('div');
     stars.style.cssText = `
       position:absolute; top:24px; right:14px;

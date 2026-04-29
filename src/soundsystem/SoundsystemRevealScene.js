@@ -16,6 +16,25 @@ import { generateAndDownloadShareImage } from '../social/ShareArtifact.js';
 
 const STAGE_A_MS = 4000;
 
+// Per-level Stage A reveal — image, headline, piece label.
+// New levels get added here without touching the rest of the scene.
+const REVEAL_BY_CITY = {
+  'new-york': {
+    bg:        '/assets/sprites/soundsystem/boombox-unlock-coney-island.png',
+    bgAlt:     'BOOMBOX UNLOCK — CONEY ISLAND',
+    headline:  'BOOMBOX UNLOCKED',
+    sub:       'ADDED TO YOUR SOUND SYSTEM',
+    haloColor: '#ff3399',
+  },
+  'puerto-rico': {
+    bg:        '/assets/sprites/soundsystem/pico-unlock-vieques.png',
+    bgAlt:     'PICÓ UNLOCK — VIEQUES',
+    headline:  'PICÓ STACK UNLOCKED',
+    sub:       'AÑADIDO A TU SOUND SYSTEM',
+    haloColor: '#00ddff',
+  },
+};
+
 export class SoundsystemRevealScene {
   constructor(gameState, switchScene) {
     this.gameState = gameState;
@@ -35,17 +54,21 @@ export class SoundsystemRevealScene {
     mountSoundOsFooter(this.el);
   }
 
-  // ── Stage A: Coney Island cinematic ────────────────────────
+  // ── Stage A: per-level unlock cinematic ────────────────────
   _mountStageA() {
     const stage = document.createElement('div');
     stage.style.cssText = 'position:absolute; inset:0; cursor:pointer;';
+
+    // Per-level reveal config (image + headline + sub + halo color)
+    const cityId = this.gameState.data.currentCity || 'new-york';
+    const reveal = REVEAL_BY_CITY[cityId] || REVEAL_BY_CITY['new-york'];
 
     // Background
     const bg = document.createElement('div');
     bg.style.cssText = 'position:absolute; inset:0; z-index:1;';
     bg.appendChild(spriteImage(
-      '/assets/sprites/soundsystem/boombox-unlock-coney-island.png',
-      'BOOMBOX UNLOCK — CONEY ISLAND',
+      reveal.bg,
+      reveal.bgAlt,
       { width: window.innerWidth, height: window.innerHeight, style: 'object-fit:cover;' }
     ));
     stage.appendChild(bg);
@@ -59,16 +82,16 @@ export class SoundsystemRevealScene {
       font-family:'Press Start 2P', monospace;
     `;
     const head = document.createElement('div');
-    head.textContent = 'BOOMBOX UNLOCKED';
+    head.textContent = reveal.headline;
     head.style.cssText = `
-      font-size:32px; color:#ff3399; text-shadow: 0 0 24px #ff3399, 4px 4px 0 #000;
+      font-size:32px; color:${reveal.haloColor}; text-shadow: 0 0 24px ${reveal.haloColor}, 4px 4px 0 #000;
       letter-spacing:4px; opacity:0; transform:translateY(8px);
       transition: opacity 600ms ease-out, transform 600ms ease-out;
     `;
     text.appendChild(head);
 
     const sub = document.createElement('div');
-    sub.textContent = 'ADDED TO YOUR SOUND SYSTEM';
+    sub.textContent = reveal.sub;
     sub.style.cssText = `
       font-size:9px; color:#00ddff; text-shadow: 0 0 8px #00ddff;
       letter-spacing:2px; margin-top:18px; opacity:0;
@@ -236,8 +259,6 @@ export class SoundsystemRevealScene {
     slot.title = tip;
 
     if (isUnlocked) {
-      // No piece-sprite overlay — the hangar PNG bakes its own boombox in slot 1.
-      // The magenta border + pulsing brightness are the unlocked affordance.
       slot.style.animation = 'slot-pulse 1.6s ease-in-out infinite alternate';
       if (!document.getElementById('ss-pulse-kf')) {
         const style = document.createElement('style');

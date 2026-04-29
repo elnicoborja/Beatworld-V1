@@ -23,19 +23,13 @@ const DEFAULT_STATE = {
     accessory: 'headphones',
     expression: 'neutral',
   },
-  tracks: {},      // cityId -> boolean[][]
-  soundSystem: [], // unlocked sound system parts (legacy V1 — string ids)
-
-  // ── Linear progression (V2) ─────────────────────────────────
-  unlockedPieces: [],   // level numbers of unlocked rig pieces, e.g. [1] after L1 win
-  completedLevels: [],  // level numbers of completed levels, e.g. [1]
-
-  // ── Per-player audio prefs (V2) ─────────────────────────────
+  tracks: {},
+  soundSystem: [],
+  unlockedPieces: [],
+  completedLevels: [],
   audioPrefs: {
-    variants: { kick: 0, snare: 0, hihat: 0, bass: 0 }, // 0-3 per instrument
-    chordProgression: 0,                                 // 0-3 (boombap/gfunk/trap/soul)
-    // Mixer state — persisted so the player's mix decisions survive reload.
-    // Defaults match AudioEngine.DEFAULT_MIX so both layers stay in sync.
+    variants: { kick: 0, snare: 0, hihat: 0, bass: 0 },
+    chordProgression: 0,
     mix: {
       master: 0,
       trackVol:    { kick: 0,    snare: 0,    hihat: 0,    perc: 0,    bass: 0,
@@ -48,13 +42,6 @@ const DEFAULT_STATE = {
       delayWet:  1.0,
     },
   },
-
-  // ── Character (V2 — 6 styles × 2 presentations = 12 variants) ──
-  // style:        'boombap' | 'gfunk' | 'punk' | 'beatmaker' | 'otaku' | 'feline'
-  // presentation: 'm' | 'f'
-  // PNG path:     /assets/sprites/characters/{style}-{presentation}.png
-  // Fallback:     {style}-m.png, then labelled placeholder.
-  // Future v1.1 will add a user-uploaded character editor.
   style: 'boombap',
   presentation: 'm',
 };
@@ -74,7 +61,6 @@ export class GameState {
       if (saved) {
         const parsed = JSON.parse(saved);
         const merged = { ...DEFAULT_STATE, ...parsed };
-        // Deep-fill audio prefs so partial saves don't crash callers
         const parsedMix = (parsed.audioPrefs && parsed.audioPrefs.mix) || {};
         merged.audioPrefs = {
           ...DEFAULT_STATE.audioPrefs,
@@ -91,27 +77,33 @@ export class GameState {
             delaySend:  { ...DEFAULT_STATE.audioPrefs.mix.delaySend,  ...(parsedMix.delaySend  || {}) },
           },
         };
-        // ── Character migration ─────────────────────────────────
-        // Three legacy shapes can land here:
-        //   1. Cadaver exquisito  : { characterParts: { head, torso, legs } }
-        //   2. Single character   : { character: 'boombap' }
-        //   3. Presentation w/ NB : { style, presentation: 'nb' } → migrate to 'f' silently
         let migratedStyle = parsed.style ?? parsed.character;
         let migratedPresentation = parsed.presentation;
-
-        if (!migratedStyle && parsed.characterParts) {
-          migratedStyle = parsed.characterParts.head;
-        }
+        if (!migratedStyle && parsed.characterParts) migratedStyle = parsed.characterParts.head;
         if (!VALID_STYLES.includes(migratedStyle)) migratedStyle = 'boombap';
         if (migratedPresentation === 'nb') migratedPresentation = 'f';
         if (!VALID_PRESENTATIONS.includes(migratedPresentation)) migratedPresentation = 'm';
-
         merged.style = migratedStyle;
         merged.presentation = migratedPresentation;
 
-        // Strip legacy keys so future writes stay clean.
-        // Only strip `character` when it's the V2 string form — leave the
-        // V1 attribute-customizer object alone in case CharacterCreatorUI is reactivated.
+        if (merged.tracks && typeof merged.tracks === 'object') {
+          for (const cityId of Object.keys(merged.tracks)) {
+            const t = merged.tracks[cityId];
+            if (Array.isArray(t)) {
+              merged.tracks[cityId] = {
+                grid: t,
+                beatName: 'UNTITLED BEAT',
+                bpm: 0, chordProgression: 0, chordProgressionName: '',
+                variants: {}, mixSnapshot: null, rating: null,
+                createdAt: '',
+                producerName: merged.playerName || 'PRODUCER',
+                cityId,
+                density: 0,
+              };
+            }
+          }
+        }
+
         delete merged.characterParts;
         if (typeof merged.character === 'string') delete merged.character;
         return merged;
@@ -119,48 +111,74 @@ export class GameState {
     } catch (e) {
       console.warn('Failed to load save:', e);
     }
-    return JSON.parse(JSON.stringify(DEFAULT_STATE)); // fresh deep clone
+    return JSON.parse(JSON.stringify(DEFAULT_STATE));
   }
 
   _save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
-    } catch (e) {
-      console.warn('Failed to save:', e);
-    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data)); }
+    catch (e) { console.warn('Failed to save:', e); }
     this._notify();
   }
 
-  _notify() {
-    for (const fn of this.listeners) fn(this.data);
-  }
+  _notify() { for (const fn of this.listeners) fn(this.data); }
 
-  onChange(fn) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  }
+  onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
 
-  update(partial) {
-    Object.assign(this.data, partial);
-    this._save();
-  }
+  update(partial) { Object.assign(this.data, partial); this._save(); }
 
-  setCurrentCity(cityId) {
-    this.data.currentCity = cityId;
-    this._save();
-  }
+  setCurrentCity(cityId) { this.data.currentCity = cityId; this._save(); }
 
   completeCity(cityId, cloutReward = 100) {
     if (this.data.completedCities.includes(cityId)) return;
     this.data.completedCities.push(cityId);
     this.data.clout += cloutReward;
-    // Level up every 3 cities
     this.data.currentLevel = Math.min(5, 1 + Math.floor(this.data.completedCities.length / 3));
     this._save();
   }
 
   saveTrack(cityId, trackData) {
-    this.data.tracks[cityId] = trackData;
+    if (Array.isArray(trackData)) {
+      this.data.tracks[cityId] = {
+        grid: trackData,
+        beatName: this.data.tracks[cityId]?.beatName || 'UNTITLED BEAT',
+        bpm: 0, chordProgression: 0, chordProgressionName: '',
+        variants: {}, mixSnapshot: null, rating: null,
+        createdAt: new Date().toISOString(),
+        producerName: this.data.playerName || 'PRODUCER',
+        cityId, density: 0,
+      };
+    } else {
+      this.data.tracks[cityId] = trackData;
+    }
+    this._save();
+  }
+
+  getBeat(cityId) {
+    const t = this.data.tracks[cityId];
+    if (!t) return null;
+    if (Array.isArray(t)) {
+      return { grid: t, beatName: 'UNTITLED BEAT', cityId, rating: null,
+               bpm: 0, chordProgression: 0, chordProgressionName: '',
+               variants: {}, mixSnapshot: null, createdAt: '',
+               producerName: this.data.playerName || 'PRODUCER', density: 0 };
+    }
+    return t;
+  }
+
+  getLatestBeat() {
+    const all = Object.values(this.data.tracks)
+      .map(t => Array.isArray(t) ? null : t)
+      .filter(Boolean)
+      .filter(b => b && b.createdAt);
+    if (!all.length) return null;
+    all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    return all[0];
+  }
+
+  setBeatRating(cityId, rating) {
+    const t = this.data.tracks[cityId];
+    if (!t || Array.isArray(t)) return;
+    t.rating = rating;
     this._save();
   }
 
@@ -171,15 +189,8 @@ export class GameState {
     }
   }
 
-  isCityCompleted(cityId) {
-    return this.data.completedCities.includes(cityId);
-  }
-
-  isCityUnlocked(cityId) {
-    // Import CITIES dynamically to avoid circular deps
-    // For now, use level-based unlocking
-    return true; // Will be gated by city level vs player level
-  }
+  isCityCompleted(cityId) { return this.data.completedCities.includes(cityId); }
+  isCityUnlocked(cityId) { return true; }
 
   reset() {
     const id = this.data.playerId;
@@ -188,7 +199,6 @@ export class GameState {
     this._save();
   }
 
-  // ── V2 linear progression ───────────────────────────────────
   unlockSoundsystemPiece(level) {
     if (!this.data.unlockedPieces.includes(level)) {
       this.data.unlockedPieces.push(level);
@@ -208,49 +218,23 @@ export class GameState {
     return this.data.completedLevels.includes(level - 1);
   }
 
-  isLevelCompleted(level) {
-    return this.data.completedLevels.includes(level);
-  }
+  isLevelCompleted(level) { return this.data.completedLevels.includes(level); }
 
-  // ── V2 audio prefs ──────────────────────────────────────────
   setVariant(instrumentType, variantIndex) {
     if (!this.data.audioPrefs.variants) this.data.audioPrefs.variants = {};
     this.data.audioPrefs.variants[instrumentType] = variantIndex;
     this._save();
   }
 
-  setChordProgression(index) {
-    this.data.audioPrefs.chordProgression = index;
-    this._save();
-  }
+  setChordProgression(index) { this.data.audioPrefs.chordProgression = index; this._save(); }
 
-  // ── Mixer persistence (V2) ─────────────────────────────────
-  setMixMaster(db) {
-    this.data.audioPrefs.mix.master = db;
-    this._save();
-  }
-  setMixTrackVol(type, db) {
-    this.data.audioPrefs.mix.trackVol[type] = db;
-    this._save();
-  }
-  setMixReverbSend(type, level) {
-    this.data.audioPrefs.mix.reverbSend[type] = level;
-    this._save();
-  }
-  setMixDelaySend(type, level) {
-    this.data.audioPrefs.mix.delaySend[type] = level;
-    this._save();
-  }
-  setMixReverbWet(level) {
-    this.data.audioPrefs.mix.reverbWet = level;
-    this._save();
-  }
-  setMixDelayWet(level) {
-    this.data.audioPrefs.mix.delayWet = level;
-    this._save();
-  }
+  setMixMaster(db) { this.data.audioPrefs.mix.master = db; this._save(); }
+  setMixTrackVol(type, db) { this.data.audioPrefs.mix.trackVol[type] = db; this._save(); }
+  setMixReverbSend(type, level) { this.data.audioPrefs.mix.reverbSend[type] = level; this._save(); }
+  setMixDelaySend(type, level) { this.data.audioPrefs.mix.delaySend[type] = level; this._save(); }
+  setMixReverbWet(level) { this.data.audioPrefs.mix.reverbWet = level; this._save(); }
+  setMixDelayWet(level) { this.data.audioPrefs.mix.delayWet = level; this._save(); }
 
-  // ── V2 character (style + presentation) ────────────────────
   setStyle(style) {
     if (!VALID_STYLES.includes(style)) return;
     this.data.style = style;
@@ -268,13 +252,9 @@ export class GameState {
     this._save();
   }
 
-  // True when a returning player has at least picked a name once
   hasOnboarded() {
     return !!this.data.playerName && this.data.playerName !== 'Producer';
   }
 
-  addClout(amount) {
-    this.data.clout = (this.data.clout || 0) + amount;
-    this._save();
-  }
+  addClout(amount) { this.data.clout = (this.data.clout || 0) + amount; this._save(); }
 }

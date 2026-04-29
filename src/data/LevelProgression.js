@@ -57,12 +57,12 @@ export const LEVEL_PROGRESSION = [
   },
   {
     level: 6,
-    region: 'BERLIN UNDERGROUND',
-    genre: 'TECHNO',
-    piece: 'WAREHOUSE STACK',
-    pieceSprite: '/assets/sprites/soundsystem/warehouse.png',
-    cityId: 'berlin',
-    color: '#ff3344',
+    region: 'JAMAICA',
+    genre: 'DUB & BASS',
+    piece: 'DUB SHACK STACK',
+    pieceSprite: '/assets/sprites/soundsystem/dub-shack.png',
+    cityId: 'kingston',
+    color: '#00cc44',
     unlocked: false,
   },
 ];

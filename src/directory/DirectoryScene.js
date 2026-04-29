@@ -191,15 +191,28 @@ export class DirectoryScene {
 
     card.appendChild(portraitWrap);
 
-    // Meta row
-    const cpName = CHORD_PROGRESSIONS[this.gameState.data.audioPrefs.chordProgression || 0]?.name || 'BOOM BAP';
+    // Meta row — driven by the player's most recent finished beat when one exists,
+    // otherwise falls back to "your city / boombox / your-current-chord-style".
+    const latestBeat = this.gameState.getLatestBeat ? this.gameState.getLatestBeat() : null;
+    const cpIdx = latestBeat?.chordProgression ?? (this.gameState.data.audioPrefs.chordProgression || 0);
+    const cpName = latestBeat?.chordProgressionName
+      || CHORD_PROGRESSIONS[cpIdx]?.name
+      || 'BOOM BAP';
+    const cityName = latestBeat?.cityId === 'puerto-rico' ? 'SAN JUAN, PR'
+                   : latestBeat?.cityId === 'new-york'    ? 'NEW YORK, USA'
+                   : 'YOUR CITY';
+    const rigName  = latestBeat?.cityId === 'puerto-rico' ? 'PICÓ STACK'
+                   : latestBeat?.cityId === 'new-york'    ? 'BOOMBOX'
+                   : 'BOOMBOX';
+    const bpm      = latestBeat?.bpm || 90;
+
     const meta = document.createElement('div');
     meta.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px 12px;';
     meta.innerHTML = `
       <div><div style="font-size:6px; color:#888;">CITY</div>
-           <div style="font-size:8px; color:#fff;">YOUR CITY</div></div>
+           <div style="font-size:8px; color:#fff;">${cityName}</div></div>
       <div><div style="font-size:6px; color:#888;">RIG</div>
-           <div style="font-size:8px; color:#00ddff;">BOOMBOX</div></div>
+           <div style="font-size:8px; color:#00ddff;">${rigName}</div></div>
       <div><div style="font-size:6px; color:#888;">STYLE</div>
            <div style="font-size:8px; color:#ff3399;">${cpName}</div></div>
       <div><div style="font-size:6px; color:#888;">CLOUT</div>
@@ -207,20 +220,41 @@ export class DirectoryScene {
     `;
     card.appendChild(meta);
 
-    // Boombox sprite + label row
+    // Latest-beat block: only renders if the player has finished a beat.
+    if (latestBeat?.beatName) {
+      const beatBlock = document.createElement('div');
+      beatBlock.style.cssText = `
+        padding:8px 10px; background:rgba(0,0,0,0.35);
+        border-left:3px solid #ffaa00; display:flex; flex-direction:column; gap:4px;
+      `;
+      const ratingStr = latestBeat.rating ? `${'★'.repeat(latestBeat.rating)}${'☆'.repeat(5 - latestBeat.rating)}` : '—';
+      beatBlock.innerHTML = `
+        <div style="font-size:6px; color:#888; letter-spacing:1px;">LATEST BEAT</div>
+        <div style="font-size:9px; color:#ffaa00; letter-spacing:1px;">"${latestBeat.beatName}"</div>
+        <div style="font-size:6px; color:#aaa;">${bpm} BPM · ${ratingStr}</div>
+      `;
+      card.appendChild(beatBlock);
+    }
+
+    // Soundsystem sprite + label row
     const rigRow = document.createElement('div');
     rigRow.style.cssText = `
       display:flex; align-items:center; gap:14px;
       padding-top:10px; border-top:1px dashed rgba(255,170,0,0.3);
     `;
+    const rigSprite = latestBeat?.cityId === 'puerto-rico'
+      ? '/assets/sprites/soundsystem/pico.png'
+      : '/assets/sprites/soundsystem/boombox.png';
     rigRow.appendChild(spriteImage(
-      '/assets/sprites/soundsystem/boombox.png',
-      'BOOMBOX',
+      rigSprite,
+      rigName,
       { width: 80, height: 80, style: 'filter: drop-shadow(0 0 8px #ff3399); flex-shrink:0;' }
     ));
     const rigLabel = document.createElement('div');
     rigLabel.style.cssText = 'font-size:6px; color:#aaa; line-height:1.7; font-style:italic;';
-    rigLabel.textContent = '"FIRST BEAT. FIRST RIG. THE START OF SOMETHING."';
+    rigLabel.textContent = latestBeat?.beatName
+      ? `"${latestBeat.producerName || this.gameState.data.playerName} · ${latestBeat.beatName}"`
+      : '"FIRST BEAT. FIRST RIG. THE START OF SOMETHING."';
     rigRow.appendChild(rigLabel);
     card.appendChild(rigRow);
 

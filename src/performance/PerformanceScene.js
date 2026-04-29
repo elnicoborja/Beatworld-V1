@@ -42,7 +42,9 @@ export class PerformanceScene {
 
     const cityId = this.gameState.data.currentCity || 'new-york';
     const city = CITIES[cityId];
-    const grid = this.gameState.data.tracks[cityId] || [];
+    // Tracks are now BeatRecord objects; pull the grid out of the wrapper.
+    const beatRecord = this.gameState.getBeat ? this.gameState.getBeat(cityId) : this.gameState.data.tracks[cityId];
+    const grid = beatRecord?.grid || (Array.isArray(beatRecord) ? beatRecord : []);
     const instruments = city ? city.instruments.slice(0, city.numInstruments) : [];
 
     const container = document.getElementById('screen-container');
@@ -54,14 +56,15 @@ export class PerformanceScene {
     const bg = document.createElement('div');
     bg.style.cssText = 'position:absolute; inset:0; z-index:1;';
     const img = new Image();
-    img.src = '/assets/sprites/venues/gig-bk-court.png';
+    // Per-level performance backdrop. NYC=basketball court, PR=block party, etc.
+    img.src = city?.performanceBackdrop || '/assets/sprites/venues/gig-bk-court.png';
     img.style.cssText = 'width:100%; height:100%; object-fit:cover; image-rendering:pixelated; display:block;';
     img.onload = () => bg.appendChild(img);
     img.onerror = () => {
       const ph = document.createElement('div');
       ph.className = 'sprite-placeholder';
       ph.style.cssText = 'width:100%; height:100%; font-size:16px;';
-      ph.textContent = '[BASKETBALL COURT GIG SCENE]';
+      ph.textContent = `[GIG SCENE — ${city?.name?.toUpperCase() || 'CITY'}]`;
       bg.appendChild(ph);
     };
     this.el.appendChild(bg);
@@ -158,7 +161,6 @@ export class PerformanceScene {
     if (step === 15) {
       this.loopCount++;
       if (this.loopCount >= TOTAL_LOOPS) {
-        // Schedule auto-advance after the last beat finishes ringing out
         setTimeout(() => this._goToReview(), 600);
       }
     }
