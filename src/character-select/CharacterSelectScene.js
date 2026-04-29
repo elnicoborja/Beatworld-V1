@@ -83,6 +83,36 @@ export class CharacterSelectScene {
     `;
     body.appendChild(nameWrap);
 
+    // City input — free-text + a verify-on-Google-Maps preview link.
+    // Stored as gameState.playerCity; used in producer card, mailto bodies,
+    // and a future Klaviyo profile when newsletter wiring lands.
+    const cityWrap = document.createElement('div');
+    cityWrap.style.cssText = 'display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:8px;';
+    const currentCity = this.gameState.data.playerCity || '';
+    cityWrap.innerHTML = `
+      <label style="font-size:8px; color:#888; letter-spacing:1px;">YOUR CITY (OPTIONAL)</label>
+      <input id="cs-city" type="text" maxlength="60" autocomplete="address-level2" spellcheck="false"
+        value="${currentCity.replace(/"/g, '&quot;')}"
+        placeholder="E.G. BOGOTÁ, COLOMBIA"
+        style="
+          font-family:'Press Start 2P', monospace;
+          font-size:9px; padding:8px 12px;
+          background:#0a0a1e; color:#00ddff;
+          border:2px solid #00ddff; text-align:center;
+          text-transform:uppercase; width:280px;
+          letter-spacing:1px; outline:none;
+        " />
+      <a id="cs-city-verify" target="_blank" rel="noopener"
+         style="
+           font-size:6px; color:#888; letter-spacing:1px;
+           text-decoration:underline; cursor:pointer;
+           ${currentCity ? '' : 'visibility:hidden;'}
+         ">
+        VERIFY ON GOOGLE MAPS ↗
+      </a>
+    `;
+    body.appendChild(cityWrap);
+
     const enterBtn = document.createElement('button');
     enterBtn.className = 'pixel-btn primary';
     enterBtn.style.cssText = 'font-size:12px; padding:14px 28px; margin-top:8px;';
@@ -93,9 +123,23 @@ export class CharacterSelectScene {
     container.appendChild(this.el);
 
     const nameInput = body.querySelector('#cs-name');
+    const cityInput = body.querySelector('#cs-city');
+    const cityVerify = body.querySelector('#cs-city-verify');
+    const updateVerifyLink = () => {
+      const v = (cityInput.value || '').trim();
+      if (v) {
+        cityVerify.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`;
+        cityVerify.style.visibility = 'visible';
+      } else {
+        cityVerify.style.visibility = 'hidden';
+      }
+    };
+    updateVerifyLink();
+    cityInput.addEventListener('input', updateVerifyLink);
     nameInput.addEventListener('input', () => { nameInput.style.borderColor = '#ffaa00'; });
     nameInput.focus();
-    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') enterBtn.click(); });
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') cityInput.focus(); });
+    cityInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') enterBtn.click(); });
 
     enterBtn.addEventListener('click', () => {
       const name = (nameInput.value || '').trim();
@@ -105,6 +149,7 @@ export class CharacterSelectScene {
         return;
       }
       this.gameState.setPlayerName(name);
+      this.gameState.setPlayerCity(cityInput.value || '');
       this.switchScene('levelSelect');
     });
   }
@@ -149,70 +194,67 @@ export class CharacterSelectScene {
     // Slightly larger gap between the two pills (was 14px on the style row, 28px here)
     row.style.cssText = 'display:flex; align-items:center; gap:28px; margin-top:4px;';
     this.presentationButtons = {};
-    const current = this.gameState.data.presentation;
-    PRESENTATIONS.forEach((p) => {
+    PRESENTATIONS.forEach(p => {
       const btn = document.createElement('button');
-      btn.className = 'pixel-btn';
-      btn.dataset.p = p;
+      const isActive = this.gameState.data.presentation === p;
+      btn.style.cssText = `
+        font-family:'Press Start 2P', monospace; font-size:14px;
+        padding:10px 18px; cursor:pointer;
+        background:${isActive ? '#ff3399' : '#1a1a3e'};
+        color:${isActive ? '#fff' : '#888'};
+        border:2px solid ${isActive ? '#ff3399' : '#333'};
+        box-shadow:${isActive ? '0 0 8px #ff3399' : '2px 2px 0 #000'};
+      `;
       btn.textContent = PRESENTATION_LABELS[p];
-      btn.style.cssText = this._pillStyle(p === current);
-      btn.addEventListener('click', () => this._selectPresentation(p));
+      btn.addEventListener('click', () => this._setPresentation(p));
       row.appendChild(btn);
       this.presentationButtons[p] = btn;
     });
     return row;
   }
 
-  _pillStyle(active) {
-    return `
-      font-family:'Press Start 2P', monospace; font-size:12px;
-      padding:10px 22px; cursor:pointer;
-      background:${active ? '#ff3399' : '#1a1a3e'};
-      color:${active ? '#fff' : '#888'};
-      border:2px solid ${active ? '#ff3399' : '#333'};
-      box-shadow:${active ? '0 0 10px #ff3399' : '2px 2px 0 #000'};
-    `;
-  }
-
-  _selectPresentation(p) {
-    this.gameState.setPresentation(p);
-    Object.entries(this.presentationButtons).forEach(([key, btn]) => {
-      btn.style.cssText = this._pillStyle(key === p);
-    });
-    this._fillPreview(this.previewWrap);
-  }
-
   _buildPreview() {
     const wrap = document.createElement('div');
     wrap.style.cssText = `
+      width:200px; height:300px;
       display:flex; align-items:center; justify-content:center;
-      width:256px; height:384px;
-      filter: drop-shadow(0 0 18px rgba(255,51,153,0.45));
+      margin:0 auto;
     `;
-    this._fillPreview(wrap);
+    const img = characterImage(this.gameState.data.style, this.gameState.data.presentation, { width: 192, height: 288 });
+    wrap.appendChild(img);
     return wrap;
   }
 
-  _fillPreview(wrap) {
-    wrap.innerHTML = '';
-    const { style, presentation } = this.gameState.data;
-    wrap.appendChild(characterImage(style, presentation, { width: 256, height: 384 }));
-  }
-
   _cycleStyle(dir) {
-    const current = this.gameState.data.style;
-    const idx = STYLES.indexOf(current);
-    const next = STYLES[(idx + dir + STYLES.length) % STYLES.length];
+    const cur = STYLES.indexOf(this.gameState.data.style);
+    const next = STYLES[(cur + dir + STYLES.length) % STYLES.length];
     this.gameState.setStyle(next);
     this.styleLabel.textContent = STYLE_LABELS[next];
-    this._fillPreview(this.previewWrap);
+    this._refreshPreview();
+  }
+
+  _setPresentation(p) {
+    this.gameState.setPresentation(p);
+    PRESENTATIONS.forEach(other => {
+      const btn = this.presentationButtons[other];
+      const on = (other === p);
+      btn.style.background = on ? '#ff3399' : '#1a1a3e';
+      btn.style.color      = on ? '#fff'    : '#888';
+      btn.style.borderColor = on ? '#ff3399' : '#333';
+      btn.style.boxShadow   = on ? '0 0 8px #ff3399' : '2px 2px 0 #000';
+    });
+    this._refreshPreview();
+  }
+
+  _refreshPreview() {
+    if (!this.previewWrap) return;
+    this.previewWrap.innerHTML = '';
+    const img = characterImage(this.gameState.data.style, this.gameState.data.presentation, { width: 192, height: 288 });
+    this.previewWrap.appendChild(img);
   }
 
   hide() {
     if (this.el) { this.el.remove(); this.el = null; }
-    this.previewWrap = null;
-    this.styleLabel = null;
-    this.presentationButtons = {};
   }
 
   update() {}

@@ -198,9 +198,12 @@ export class DirectoryScene {
     const cpName = latestBeat?.chordProgressionName
       || CHORD_PROGRESSIONS[cpIdx]?.name
       || 'BOOM BAP';
-    const cityName = latestBeat?.cityId === 'puerto-rico' ? 'SAN JUAN, PR'
-                   : latestBeat?.cityId === 'new-york'    ? 'NEW YORK, USA'
-                   : 'YOUR CITY';
+    // Prefer the player's stored home city; fall back to last-beat region.
+    const cityName = (this.gameState.data.playerCity || '').toUpperCase()
+      || (latestBeat?.cityId === 'puerto-rico' ? 'SAN JUAN, PR'
+       : latestBeat?.cityId === 'new-york'    ? 'NEW YORK, USA'
+       : 'YOUR CITY');
+    const cityMapsUrl = this.gameState.getPlayerCityMapsUrl?.() || '';
     const rigName  = latestBeat?.cityId === 'puerto-rico' ? 'PICÓ STACK'
                    : latestBeat?.cityId === 'new-york'    ? 'BOOMBOX'
                    : 'BOOMBOX';
@@ -210,7 +213,7 @@ export class DirectoryScene {
     meta.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px 12px;';
     meta.innerHTML = `
       <div><div style="font-size:6px; color:#888;">CITY</div>
-           <div style="font-size:8px; color:#fff;">${cityName}</div></div>
+           <div style="font-size:8px; color:#fff;">${cityName}${cityMapsUrl ? ` <a href="${cityMapsUrl}" target="_blank" rel="noopener" style="color:#00ddff; text-decoration:none; font-size:6px; margin-left:4px;">📍</a>` : ''}</div></div>
       <div><div style="font-size:6px; color:#888;">RIG</div>
            <div style="font-size:8px; color:#00ddff;">${rigName}</div></div>
       <div><div style="font-size:6px; color:#888;">STYLE</div>
@@ -380,7 +383,7 @@ export class DirectoryScene {
         input.focus();
         return;
       }
-      const body = encodeURIComponent(`Email: ${email}\nProducer: ${this.gameState.data.playerName}`);
+      const body = encodeURIComponent(`Email: ${email}\nProducer: ${this.gameState.data.playerName}\nCity: ${this.gameState.data.playerCity || ''}\nMaps: ${this.gameState.getPlayerCityMapsUrl?.() || ''}`);
       const subject = encodeURIComponent(JOIN_SUBJECT);
       window.location.href = `mailto:${JOIN_EMAIL_TO}?subject=${subject}&body=${body}`;
       close();

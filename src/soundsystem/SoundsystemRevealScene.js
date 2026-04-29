@@ -16,6 +16,17 @@ import { generateAndDownloadShareImage } from '../social/ShareArtifact.js';
 
 const STAGE_A_MS = 4000;
 
+// Short culture/region prose shown on Stage B under the hero rig.
+// One paragraph, 2-3 sentences — context, not lore-dump. Per-region.
+const RIG_CULTURE_BY_CITY = {
+  'new-york':    'THE BRONX-BORN ICON. TWIN CHROME SPEAKERS, DUAL CASSETTE DECKS, ANTENNA UP. THE PORTABLE RIG THAT GAVE HIP-HOP ITS FIRST SOUNDSYSTEM — BLOCK PARTIES, B-BOY CIRCLES, YOUR SHOULDER.',
+  'puerto-rico': 'EL PICÓ — ALMA DE LA CALLE CARIBEÑA. HAND-PAINTED COLUMN STACK BORN IN THE CARIBBEAN, WEAPONIZED FOR PERREO. BORICUA STRIPES, COQUÍ FROG, PALM TREES. EL BLOQUE IS THE VENUE.',
+  'rio':         'BAILE FUNK\'S MOTORIZED SOUNDSYSTEM. WHEELED HORN-LOADED SPEAKER TRUCK BORN IN RIO\'S FAVELAS — WHEELS IN THE STREETS, BASS IN THE AIR.',
+  'bogota':      'ANDEAN BASS CABINET. UNDERGROUND TECH HOUSE FROM BOGOTÁ\'S CHAPINERO WAREHOUSES — DEEP, DARK, RELENTLESS.',
+  'mexico-city': 'SONIDERO RIG. HAND-LETTERED SIGNAGE FRAMES THE STACK. ANNOUNCERS GIVE SHOUT-OUTS LIVE OVER CUMBIA — A MEXICO CITY STREET-PARTY INSTITUTION.',
+  'kingston':    'DUB SHACK STACK. KING TUBBY\'S TRADITION. HAND-BUILT WOODEN CABINETS PAINTED RED-GOLD-GREEN. THE RIG IS SACRED — JAMAICA IS WHERE THE SOUNDSYSTEM BEGAN.',
+};
+
 // Per-level Stage A reveal — image, headline, piece label.
 // New levels get added here without touching the rest of the scene.
 const REVEAL_BY_CITY = {
@@ -157,129 +168,169 @@ export class SoundsystemRevealScene {
     } catch (e) { /* audio not ready — silent */ }
   }
 
-  // ── Stage B: Hangar showcase ───────────────────────────────
+  // ── Stage B: Hero rig + culture text + collection row ─────────
+  // Drops the hangar background (alignment problems with painted stages).
+  // Instead: clean dark gradient bg, the newly-unlocked rig as the hero,
+  // a short culture/region paragraph, then a row of all 6 rigs (unlocked
+  // ones full-color, locked ones as silhouettes). Fully responsive.
   _mountStageB() {
-    // Wipe stage A and replace with stage B — keep this.el container
     this.el.innerHTML = '';
+    const cityId = this.gameState.data.currentCity || 'new-york';
+    const currentLevel = LEVEL_PROGRESSION.find(l => l.cityId === cityId) || LEVEL_PROGRESSION[0];
 
     const stage = document.createElement('div');
-    stage.style.cssText = 'position:absolute; inset:0;';
-
-    // Background (hangar img or 6-slot placeholder grid)
-    const bg = document.createElement('div');
-    bg.style.cssText = 'position:absolute; inset:0; z-index:1;';
-    const img = new Image();
-    img.src = '/assets/sprites/ui/soundsystem-hangar.png';
-    img.style.cssText = 'width:100%; height:100%; object-fit:cover; image-rendering:pixelated; display:block;';
-    img.onload = () => bg.appendChild(img);
-    img.onerror = () => bg.appendChild(this._buildHangarPlaceholder());
-    stage.appendChild(bg);
-
-    // No "MY SOUND SYSTEM" title overlay — the hangar PNG bakes its own title.
-
-    // 6 interactive slot overlays (positioned across the bottom 60% of the screen).
-    // align-items:end bottom-anchors every slot to the hangar's painted floor.
-    const slots = document.createElement('div');
-    slots.style.cssText = `
-      position:absolute; bottom:18%; left:0; right:0;
-      display:grid; grid-template-columns:repeat(6, 1fr);
-      gap:0; z-index:5; padding:0 4%;
-      align-items:end;
+    stage.style.cssText = `
+      position:absolute; inset:0;
+      background:radial-gradient(ellipse at 50% 30%, ${currentLevel.color}22 0%, #0a0a1e 60%);
+      overflow-y:auto; overflow-x:hidden;
+      display:flex; flex-direction:column; align-items:center;
+      padding:32px 16px 100px;
+      box-sizing:border-box;
+      font-family:'Press Start 2P', monospace;
     `;
-    LEVEL_PROGRESSION.forEach(level => slots.appendChild(this._buildSlot(level)));
-    stage.appendChild(slots);
 
-    // Action buttons
+    // Title
+    const title = document.createElement('h1');
+    title.style.cssText = `
+      font-size:14px; color:#ffaa00; letter-spacing:4px;
+      text-shadow: 0 0 12px #ffaa00, 4px 4px 0 #000;
+      margin:0 0 20px;
+    `;
+    title.textContent = 'MY SOUND SYSTEM';
+    stage.appendChild(title);
+
+    // Hero rig (newly unlocked)
+    const hero = document.createElement('div');
+    hero.style.cssText = `
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      padding:24px; margin-bottom:24px;
+      background:rgba(0,0,0,0.5);
+      border:3px solid ${currentLevel.color};
+      box-shadow: 0 0 32px ${currentLevel.color}aa, inset 0 0 24px ${currentLevel.color}33;
+      max-width:90vw; width:380px;
+    `;
+    const heroLabel = document.createElement('div');
+    heroLabel.style.cssText = `font-size:7px; color:#888; letter-spacing:3px;`;
+    heroLabel.textContent = `LEVEL ${String(currentLevel.level).padStart(2,'0')} · UNLOCKED`;
+    hero.appendChild(heroLabel);
+
+    const heroImg = new Image();
+    heroImg.src = currentLevel.pieceSprite;
+    heroImg.alt = currentLevel.piece;
+    heroImg.style.cssText = `
+      width:200px; height:200px; max-width:60vw; max-height:60vw;
+      image-rendering:pixelated;
+      filter: drop-shadow(0 0 24px ${currentLevel.color});
+      animation: bw-rig-float 3s ease-in-out infinite alternate;
+    `;
+    heroImg.onerror = () => {
+      heroImg.style.display = 'none';
+      const ph = document.createElement('div');
+      ph.className = 'sprite-placeholder';
+      ph.style.cssText = `width:200px; height:200px; border-color:${currentLevel.color}; color:${currentLevel.color};`;
+      ph.textContent = `[${currentLevel.piece}]`;
+      hero.appendChild(ph);
+    };
+    hero.appendChild(heroImg);
+
+    if (!document.getElementById('bw-rig-float-kf')) {
+      const kf = document.createElement('style');
+      kf.id = 'bw-rig-float-kf';
+      kf.textContent = `@keyframes bw-rig-float { from { transform: translateY(0); } to { transform: translateY(-6px); } }`;
+      document.head.appendChild(kf);
+    }
+
+    const heroName = document.createElement('div');
+    heroName.style.cssText = `
+      font-size:18px; color:${currentLevel.color}; letter-spacing:3px;
+      text-shadow: 0 0 14px ${currentLevel.color}, 2px 2px 0 #000;
+      text-align:center;
+    `;
+    heroName.textContent = currentLevel.piece;
+    hero.appendChild(heroName);
+
+    const heroRegion = document.createElement('div');
+    heroRegion.style.cssText = `font-size:9px; color:#00ddff; letter-spacing:2px;`;
+    heroRegion.textContent = `${currentLevel.region} · ${currentLevel.genre}`;
+    hero.appendChild(heroRegion);
+
+    // Culture/region paragraph
+    const culture = document.createElement('div');
+    culture.style.cssText = `
+      max-width:90vw; width:520px;
+      padding:14px 18px; margin-bottom:24px;
+      background:rgba(10,10,30,0.7); border:1px solid #444;
+      font-size:8px; color:#fff; line-height:2;
+      letter-spacing:0.8px; text-align:center; font-style:italic;
+    `;
+    culture.textContent = RIG_CULTURE_BY_CITY[cityId] || RIG_CULTURE_BY_CITY['new-york'];
+    stage.appendChild(hero);
+    stage.appendChild(culture);
+
+    // Collection row — all 6 rigs, unlocked full-color, locked silhouetted
+    const collection = document.createElement('div');
+    collection.style.cssText = `
+      display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+      margin-bottom:24px; max-width:100vw;
+    `;
+    LEVEL_PROGRESSION.forEach(level => collection.appendChild(this._buildCollectionItem(level)));
+    stage.appendChild(collection);
+
     const actions = document.createElement('div');
-    actions.style.cssText = `
-      position:absolute; bottom:36px; left:0; right:0;
-      display:flex; gap:14px; justify-content:center; z-index:20;
-    `;
-
+    actions.style.cssText = `display:flex; gap:10px; flex-wrap:wrap; justify-content:center;`;
     const shareBtn = document.createElement('button');
     shareBtn.className = 'pixel-btn cyan';
     shareBtn.style.cssText = 'font-size:10px; padding:12px 22px; box-shadow: 0 0 16px #00ddff;';
     shareBtn.textContent = '⎘ SHARE YOUR RIG';
     shareBtn.addEventListener('click', () => generateAndDownloadShareImage(this.gameState));
     actions.appendChild(shareBtn);
-
     const dirBtn = document.createElement('button');
     dirBtn.className = 'pixel-btn magenta';
     dirBtn.style.cssText = 'font-size:10px; padding:12px 22px; box-shadow: 0 0 16px #ff3399;';
-    dirBtn.textContent = 'SEE THE DIRECTORY ▶';
+    dirBtn.textContent = 'DIRECTORY ▶';
     dirBtn.addEventListener('click', () => this.switchScene('directory'));
     actions.appendChild(dirBtn);
-
     const backBtn = document.createElement('button');
-    backBtn.className = 'pixel-btn cyan';
-    backBtn.style.cssText = 'font-size:8px; padding:12px 18px;';
-    backBtn.textContent = '← BACK TO LEVELS';
+    backBtn.className = 'pixel-btn';
+    backBtn.style.cssText = 'font-size:8px; padding:12px 18px; background:#1a1a3e; color:#888; border:2px solid #333;';
+    backBtn.textContent = '← LEVELS';
     backBtn.addEventListener('click', () => this.switchScene('levelSelect'));
     actions.appendChild(backBtn);
-
     stage.appendChild(actions);
     this.el.appendChild(stage);
     mountSoundOsFooter(this.el);
   }
 
-  _buildHangarPlaceholder() {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = `
-      width:100%; height:100%; padding:120px 40px 200px;
-      display:grid; grid-template-columns:repeat(6, 1fr); gap:12px;
-      background:linear-gradient(180deg, #0a0a1e 0%, #1a1a3e 60%, #0a0a1e 100%);
-      box-sizing:border-box;
-    `;
-    LEVEL_PROGRESSION.forEach(level => {
-      const slot = document.createElement('div');
-      slot.className = 'sprite-placeholder';
-      slot.style.cssText = `
-        height:100%; flex-direction:column; gap:8px; font-size:10px;
-        border-color:${level.unlocked ? level.color : '#444'};
-        color:${level.unlocked ? level.color : '#444'};
-      `;
-      slot.innerHTML = `<div>L${level.level}</div><div style="font-size:7px;">${level.region}</div><div style="font-size:8px;">${level.unlocked ? '✓' : '🔒'} ${level.piece}</div>`;
-      wrap.appendChild(slot);
-    });
-    return wrap;
-  }
-
-  _buildSlot(level) {
+  _buildCollectionItem(level) {
     const isUnlocked = this.gameState.data.unlockedPieces.includes(level.level);
-    const slot = document.createElement('div');
-    if (isUnlocked) {
-      // Tightened to wrap the boombox + pedestal painted in the hangar PNG.
-      // ~11vw × 20vh with px clamps for tiny / huge viewports. Bottom-aligned
-      // to the floor via the grid's align-items:end.
-      slot.style.cssText = `
-        width:11vw; max-width:200px; min-width:80px;
-        height:20vh; max-height:240px; min-height:120px;
-        margin:0 auto; cursor:default; position:relative;
-        border:2px solid ${level.color};
-        box-shadow: inset 0 0 18px ${level.color}55, 0 0 16px ${level.color}aa;
-        background:${level.color}11;
-      `;
-    } else {
-      slot.style.cssText = `
-        height:140px; cursor:not-allowed; position:relative;
-        border:1px dashed #333; background:rgba(0,0,0,0.2);
-      `;
-    }
-    const tip = isUnlocked
-      ? `L${level.level} · ${level.region} · ${level.piece} ✓ — BUILT FROM YOUR FIRST BEAT`
-      : `L${level.level} · ${level.region} · ${level.piece} 🔒 — UNLOCK BY COMPLETING LEVEL ${level.level - 1}`;
-    slot.title = tip;
-
-    if (isUnlocked) {
-      slot.style.animation = 'slot-pulse 1.6s ease-in-out infinite alternate';
-      if (!document.getElementById('ss-pulse-kf')) {
-        const style = document.createElement('style');
-        style.id = 'ss-pulse-kf';
-        style.textContent = `@keyframes slot-pulse { from { filter: brightness(1); } to { filter: brightness(1.3); } }`;
-        document.head.appendChild(style);
-      }
-    }
-    return slot;
+    const cell = document.createElement('div');
+    cell.style.cssText = `
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      width:80px; padding:8px;
+      background:rgba(0,0,0,0.4);
+      border:1px solid ${isUnlocked ? level.color : '#333'};
+      ${isUnlocked ? `box-shadow: 0 0 8px ${level.color}66;` : 'opacity:0.45;'}
+    `;
+    const img = new Image();
+    img.src = level.pieceSprite;
+    img.alt = level.piece;
+    img.style.cssText = `
+      width:48px; height:48px; image-rendering:pixelated;
+      ${isUnlocked ? '' : 'filter: brightness(0.2) contrast(2);'}
+    `;
+    img.onerror = () => {
+      img.style.display = 'none';
+      const ph = document.createElement('div');
+      ph.style.cssText = `width:48px; height:48px; background:${isUnlocked ? level.color + '33' : '#222'}; border:1px dashed ${isUnlocked ? level.color : '#444'};`;
+      cell.insertBefore(ph, cell.firstChild);
+    };
+    cell.appendChild(img);
+    const lab = document.createElement('div');
+    lab.style.cssText = `font-size:5px; color:${isUnlocked ? level.color : '#666'}; letter-spacing:1px; text-align:center;`;
+    lab.textContent = `L${level.level}`;
+    cell.appendChild(lab);
+    cell.title = isUnlocked ? `${level.region} · ${level.piece} ✓` : `${level.region} · ${level.piece} 🔒`;
+    return cell;
   }
 
   hide() {

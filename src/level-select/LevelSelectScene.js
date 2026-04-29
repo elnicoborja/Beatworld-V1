@@ -232,7 +232,7 @@ export class LevelSelectScene {
       const email = (input.value || '').trim();
       if (!email || !email.includes('@')) { input.style.borderColor = '#ff3344'; input.focus(); return; }
       const subject = encodeURIComponent(`Beat World — Notify me when ${level.region} (Level ${level.level}) ships`);
-      const body = encodeURIComponent(`Email: ${email}\nLevel: ${level.level} ${level.region} ${level.genre}`);
+      const body = encodeURIComponent(`Email: ${email}\nLevel: ${level.level} ${level.region} ${level.genre}\nCity: ${this.gameState.data.playerCity || ''}\nMaps: ${this.gameState.getPlayerCityMapsUrl?.() || ''}`);
       window.location.href = `mailto:hola@nicoborja.com?subject=${subject}&body=${body}`;
       close();
     });

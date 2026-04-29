@@ -8,6 +8,10 @@ const STORAGE_KEY = 'beatworld_save_v2';
 const DEFAULT_STATE = {
   playerId: crypto.randomUUID ? crypto.randomUUID() : `bw-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   playerName: 'Producer',
+  // Player's home city — free-text but structured-enough that we can drop
+  // it into a Google Maps search URL. Set via Character Select onboarding.
+  // Used in producer card, email signup CTAs, and the share artifact future v1.1.
+  playerCity: '',
   currentLevel: 1,
   currentCity: null,
   completedCities: [],
@@ -254,6 +258,17 @@ export class GameState {
     this.data.playerName = (name || 'PRODUCER').toUpperCase().slice(0, 12);
     this._save();
   }
+
+  setPlayerCity(city) {
+    this.data.playerCity = (city || '').trim().slice(0, 60);
+    this._save();
+  }
+
+  getPlayerCityMapsUrl() {
+    if (!this.data.playerCity) return '';
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(this.data.playerCity)}`;
+  }
+
   hasOnboarded() {
     return !!this.data.playerName && this.data.playerName !== 'Producer';
   }

@@ -187,7 +187,7 @@ export class ReviewScene {
     // ── Score / clout / actions panel (bottom-center-right) ──
     const scorePanel = document.createElement('div');
     scorePanel.style.cssText = `
-      position:absolute; right:16px; bottom:16px; z-index:5;
+      position:absolute; right:16px; top:16px; z-index:5;
       max-width:300px; padding:14px;
       background:rgba(10,10,30,0.94); border:2px solid #ffaa00;
       box-shadow: 0 0 24px rgba(0,0,0,0.85), 4px 4px 0 #000;
