@@ -214,8 +214,11 @@ export class GameState {
   }
 
   isLevelUnlocked(level) {
+    // May 1 demo gate: only L1 + L2 are playable. L3-L6 are COMING SOON
+    // regardless of progression — the locked-card preview modal handles them.
     if (level === 1) return true;
-    return this.data.completedLevels.includes(level - 1);
+    if (level === 2) return this.data.completedLevels.includes(1);
+    return false;
   }
 
   isLevelCompleted(level) { return this.data.completedLevels.includes(level); }
@@ -251,7 +254,6 @@ export class GameState {
     this.data.playerName = (name || 'PRODUCER').toUpperCase().slice(0, 12);
     this._save();
   }
-
   hasOnboarded() {
     return !!this.data.playerName && this.data.playerName !== 'Producer';
   }

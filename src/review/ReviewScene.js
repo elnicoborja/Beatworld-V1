@@ -124,99 +124,111 @@ export class ReviewScene {
     const container = document.getElementById('screen-container');
     this.el = document.createElement('div');
     this.el.className = 'scene-overlay';
-    this.el.style.cssText = 'background: radial-gradient(ellipse at top, #1a1a3e 0%, #0a0a1e 70%);';
+    this.el.style.cssText = 'background:#0a0a1e; overflow:hidden;';
 
-    const body = document.createElement('div');
-    body.className = 'scene-body';
-    body.style.cssText = 'padding:32px 24px; gap:18px;';
+    // ── Magazine cover as fullscreen background ──────────────
+    // The cover is the hero artwork — it deserves the whole canvas.
+    // Critic comment + scores + actions overlay on top of it.
+    const coverBg = document.createElement('div');
+    coverBg.style.cssText = `
+      position:absolute; inset:0; z-index:1;
+      display:flex; align-items:center; justify-content:center;
+      background:#0a0a1e;
+    `;
+    const coverImg = new Image();
+    coverImg.src = cfg.coverPath;
+    coverImg.alt = cfg.coverAltText;
+    coverImg.style.cssText = `
+      max-width:100%; max-height:100%;
+      width:auto; height:100%;
+      object-fit:contain; image-rendering:pixelated;
+      filter: drop-shadow(0 0 24px rgba(0,0,0,0.6));
+    `;
+    coverImg.onerror = () => {
+      const ph = document.createElement('div');
+      ph.className = 'sprite-placeholder';
+      ph.style.cssText = 'width:60vmin; height:75vmin; font-size:14px;';
+      ph.textContent = `[${cfg.coverAltText}]`;
+      coverBg.appendChild(ph);
+    };
+    coverBg.appendChild(coverImg);
 
-    const title = document.createElement('h1');
-    title.className = 'scene-title';
-    title.textContent = 'MEDIA REVIEWS';
-    body.appendChild(title);
+    // Filled-stars overlay (positioned over the cover's empty star row)
+    const starsOverlay = this._buildStarsOverlay(rating, cfg);
+    coverBg.appendChild(starsOverlay);
+    this.el.appendChild(coverBg);
 
-    // ── Cover + critic row ───────────────────────────────────
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; justify-content:center;';
-
-    // Magazine cover with star overlay (per-level)
-    row.appendChild(this._buildCoverWithStars(rating, cfg));
-
-    // Critic column (per-level)
-    const criticCol = document.createElement('div');
-    criticCol.style.cssText = 'display:flex; flex-direction:column; align-items:center; gap:10px; min-width:256px;';
-    criticCol.appendChild(spriteImage(
-      cfg.criticPath,
-      'CRITIC PORTRAIT',
-      { width: 200, height: 200, style: 'filter: drop-shadow(0 0 12px #ff3399);' }
+    // ── Critic comment box (bottom-left) ─────────────────────
+    const criticBox = document.createElement('div');
+    criticBox.style.cssText = `
+      position:absolute; left:16px; bottom:16px; z-index:5;
+      max-width:340px; min-width:240px; padding:14px;
+      background:rgba(10,10,30,0.94); border:2px solid ${cfg.criticName === 'YOUNG MIKO' ? '#ff3399' : '#00ddff'};
+      box-shadow: 0 0 24px rgba(0,0,0,0.85), 4px 4px 0 #000;
+      display:flex; gap:12px; align-items:flex-start;
+      font-family:'Press Start 2P', monospace;
+    `;
+    const criticPortrait = document.createElement('div');
+    criticPortrait.style.cssText = 'flex-shrink:0;';
+    criticPortrait.appendChild(spriteImage(
+      cfg.criticPath, 'CRITIC PORTRAIT',
+      { width: 64, height: 64, style: 'filter: drop-shadow(0 0 8px #ff3399);' }
     ));
-    const outlet = document.createElement('div');
-    outlet.style.cssText = 'font-size:9px; color:#00ddff; letter-spacing:2px; text-align:center;';
-    outlet.textContent = cfg.outletDisplay;
-    criticCol.appendChild(outlet);
+    const criticText = document.createElement('div');
+    criticText.style.cssText = 'display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;';
+    criticText.innerHTML = `
+      <div style="font-size:7px; color:#00ddff; letter-spacing:2px;">${cfg.outletDisplay}</div>
+      <div style="font-size:7px; color:#fff; line-height:1.7; letter-spacing:0.5px;">"${reviewText}"</div>
+    `;
+    criticBox.appendChild(criticPortrait);
+    criticBox.appendChild(criticText);
+    this.el.appendChild(criticBox);
 
-    const reviewBox = document.createElement('div');
-    reviewBox.style.cssText = `
+    // ── Score / clout / actions panel (bottom-center-right) ──
+    const scorePanel = document.createElement('div');
+    scorePanel.style.cssText = `
+      position:absolute; right:16px; bottom:16px; z-index:5;
       max-width:300px; padding:14px;
-      background:rgba(0,0,0,0.5); border:1px solid #ffaa00;
-      font-size:8px; color:#fff; line-height:1.6; letter-spacing:1px;
-      text-align:center;
+      background:rgba(10,10,30,0.94); border:2px solid #ffaa00;
+      box-shadow: 0 0 24px rgba(0,0,0,0.85), 4px 4px 0 #000;
+      display:flex; flex-direction:column; gap:10px;
+      font-family:'Press Start 2P', monospace;
     `;
-    reviewBox.textContent = reviewText;
-    criticCol.appendChild(reviewBox);
-
-    row.appendChild(criticCol);
-    body.appendChild(row);
-
-    // ── Clout reveal ─────────────────────────────────────────
-    const clout = document.createElement('div');
-    clout.style.cssText = `
-      font-family:'Press Start 2P', monospace; text-align:center;
-      padding:14px 24px; border:2px solid #ffaa00;
-      background:rgba(255,170,0,0.1);
-      animation: pulse 1.4s ease-in-out infinite alternate;
+    scorePanel.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div>
+          <div style="font-size:6px; color:#888; letter-spacing:1px;">RATING</div>
+          <div style="font-size:18px; color:#ffaa00; text-shadow: 0 0 10px #ffaa00; letter-spacing:2px; margin-top:4px;">
+            ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:6px; color:#888; letter-spacing:1px;">+CLOUT</div>
+          <div style="font-size:18px; color:#00cc44; text-shadow: 0 0 10px #00cc44; letter-spacing:2px; margin-top:4px;">+${cloutReward}</div>
+        </div>
+      </div>
+      <div style="font-size:6px; color:#888; font-style:italic; line-height:1.6; padding-top:6px; border-top:1px dashed #444;">
+        ${cityId === 'puerto-rico'
+          ? 'TRES ESTRELLAS ES EL TECHO EN LA ISLA.'
+          : 'EVEN THE GREATEST DONT GET MORE THAN 2 STARS IN NYC.'}
+      </div>
     `;
-    clout.innerHTML = `
-      <div style="font-size:7px; color:#888; letter-spacing:1px;">+CLOUT EARNED</div>
-      <div style="font-size:24px; color:#ffaa00; text-shadow: 0 0 16px #ffaa00; margin-top:8px; letter-spacing:2px;">+${cloutReward}</div>
-    `;
-    body.appendChild(clout);
-
-    // ── System-honest footer ─────────────────────────────────
-    const honesty = document.createElement('div');
-    honesty.style.cssText = `
-      font-size:7px; color:#888; font-style:italic; text-align:center;
-      max-width:520px; line-height:1.6; padding:0 16px;
-    `;
-    honesty.textContent = cityId === 'puerto-rico'
-      ? "TRES ESTRELLAS ES EL TECHO EN LA ISLA. EL CUARTO LO GANAS EN EL PRÓXIMO BLOQUE."
-      : "EVEN THE GREATEST DON'T GET MORE THAN 2 STARS IN NYC. EARN YOUR REPUTATION.";
-    body.appendChild(honesty);
-
-    // ── Action buttons ───────────────────────────────────────
-    // BACK TO LEVELS skips the soundsystem reveal cinematic — the
-    // unlocked piece is already saved, so the player can revisit it
-    // any time from levelSelect → directory.
     const actions = document.createElement('div');
-    actions.style.cssText = 'display:flex; gap:14px; flex-wrap:wrap; justify-content:center;';
-
+    actions.style.cssText = 'display:flex; gap:8px; padding-top:6px;';
     const backBtn = document.createElement('button');
     backBtn.className = 'pixel-btn cyan';
-    backBtn.style.cssText = 'font-size:8px; padding:14px 20px;';
-    backBtn.textContent = '← BACK TO LEVELS';
+    backBtn.style.cssText = 'font-size:7px; padding:10px 12px;';
+    backBtn.textContent = '← LEVELS';
     backBtn.addEventListener('click', () => this.switchScene('levelSelect'));
-    actions.appendChild(backBtn);
-
     const nextBtn = document.createElement('button');
     nextBtn.className = 'pixel-btn magenta';
-    nextBtn.style.cssText = 'font-size:11px; padding:14px 28px; box-shadow: 0 0 16px #ff3399;';
+    nextBtn.style.cssText = 'font-size:9px; padding:10px 16px; flex:1; box-shadow: 0 0 12px #ff3399;';
     nextBtn.textContent = 'NEXT ▶';
     nextBtn.addEventListener('click', () => this.switchScene('soundsystemReveal'));
+    actions.appendChild(backBtn);
     actions.appendChild(nextBtn);
-
-    body.appendChild(actions);
-
-    this.el.appendChild(body);
+    scorePanel.appendChild(actions);
+    this.el.appendChild(scorePanel);
     container.appendChild(this.el);
 
     if (!document.getElementById('rev-pulse-kf')) {
@@ -234,32 +246,29 @@ export class ReviewScene {
     mountSoundOsFooter(this.el);
   }
 
-  _buildCoverWithStars(rating, cfg) {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative; width:280px; height:350px;';
-    wrap.appendChild(spriteImage(
-      cfg.coverPath,
-      cfg.coverAltText,
-      { width: 280, height: 350 }
-    ));
+  // ── Star overlay positioned where the cover's empty star row sits ──
+  // The cover's star row is in the upper-right ~10% from top, ~10% from right.
+  // This overlay floats on top of the fullscreen cover.
+  _buildStarsOverlay(rating) {
     const stars = document.createElement('div');
     stars.style.cssText = `
-      position:absolute; top:24px; right:14px;
-      display:flex; gap:4px; pointer-events:none;
+      position:absolute; top:8%; right:10%; z-index:3;
+      display:flex; gap:6px; pointer-events:none;
+      background:rgba(0,0,0,0.4); padding:6px 10px;
+      border:1px solid rgba(255,170,0,0.4);
     `;
     for (let i = 0; i < 5; i++) {
       const s = document.createElement('span');
       const filled = i < rating;
       s.style.cssText = `
-        font-size:18px; line-height:1;
+        font-size:24px; line-height:1;
         color:${filled ? '#ffaa00' : '#444'};
-        text-shadow:${filled ? '0 0 8px #ffaa00' : 'none'};
+        text-shadow:${filled ? '0 0 12px #ffaa00' : 'none'};
       `;
       s.textContent = '★';
       stars.appendChild(s);
     }
-    wrap.appendChild(stars);
-    return wrap;
+    return stars;
   }
 
   hide() {

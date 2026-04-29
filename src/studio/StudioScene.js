@@ -44,7 +44,7 @@ const FRIEND_TIPS = [
 
 // Cell + lane sizing — bumped from V1 (22px) to ~64px for finger-friendly tap.
 const LANE_HEIGHT = 110;
-const STEP_CELL_HEIGHT = 32;
+const STEP_CELL_HEIGHT = 44;
 
 // One-shot CSS injection so we get pixel-art rectangular fader thumbs across
 // all <input type=range> elements inside the studio.
@@ -534,7 +534,7 @@ export class StudioScene {
         const isBeat = stepIdx % 4 === 0;
         const active = this.grid[trackIdx][stepIdx];
         cell.style.cssText = `
-          width:100%; min-width:18px; height:${STEP_CELL_HEIGHT}px; cursor:pointer;
+          width:100%; min-width:28px; height:${STEP_CELL_HEIGHT}px; cursor:pointer;
           border:1px solid ${isBeat ? '#444' : '#222'};
           background:${active ? trackColor : (isBeat ? '#1e3050' : '#1a2a4a')};
           opacity:${active ? 1 : 0.6};
@@ -569,10 +569,10 @@ export class StudioScene {
     // justify-content: space-between pins them to opposite edges so the
     // variant always sits at the end of the name row regardless of name length.
     const row1 = document.createElement('div');
-    row1.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px;';
+    row1.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; padding-right:6px;';
     const nameEl = document.createElement('div');
     nameEl.style.cssText = `
-      font-size:9px; color:${trackColor}; letter-spacing:1px;
+      font-size:8px; color:${trackColor}; letter-spacing:1px;
       text-shadow: 0 0 4px ${trackColor}66;
       flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     `;

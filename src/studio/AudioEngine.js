@@ -10,6 +10,7 @@ const SAMPLE_PATHS = {
   hihat: ['hihat_01.mp3', 'hihat_02.mp3', 'hihat_03.mp3', 'hihat_04.mp3'],
   perc:  ['perc_01.mp3',  'perc_02.mp3',  'perc_03.mp3',  'perc_04.mp3'],
   bass:  ['bass_01.mp3',  'bass_02.mp3',  'bass_03.mp3',  'bass_04.mp3'],
+  lead:  ['synth_01.mp3', 'synth_02.mp3', 'synth_03.mp3', 'synth_04.mp3'],
 };
 
 export const CHORD_PROGRESSIONS = [
@@ -57,7 +58,7 @@ export class AudioEngine {
     this.playing = false; this.currentStep = 0; this.stepCallback = null; this.loopId = null;
     this.masterVol = null; this.reverb = null; this.delay = null; this.compressor = null;
     this.tracks = {};
-    this.samples = { kick:[null,null,null,null], snare:[null,null,null,null], hihat:[null,null,null,null], perc:[null,null,null,null], bass:[null,null,null,null] };
+    this.samples = { kick:[null,null,null,null], snare:[null,null,null,null], hihat:[null,null,null,null], perc:[null,null,null,null], bass:[null,null,null,null], lead:[null,null,null,null] };
     this.chordLoops = [null, null, null, null];
     this.currentChordPlayer = null;
     this.audioPrefs = {
@@ -218,8 +219,16 @@ export class AudioEngine {
     const sampler = this.samples[type]?.[idx];
     if (sampler) {
       try {
-        if (type === 'bass') sampler.triggerAttack(note || 'C2', t);
-        else sampler.triggerAttack('C4', t);
+        // Voice-stealing for sustained instruments (bass + lead): release any
+        // ringing notes so the new note replaces the prior one. Drums (kick/
+        // snare/hihat/perc) keep poly so multiple hits in quick succession
+        // can naturally layer.
+        if (type === 'bass' || type === 'lead') {
+          try { sampler.releaseAll(t); } catch (_) {}
+          sampler.triggerAttack(type === 'bass' ? (note || 'C2') : 'C4', t);
+        } else {
+          sampler.triggerAttack('C4', t);
+        }
         return;
       } catch (e) { console.warn(`[AudioEngine] Sample trigger failed for ${type}[${idx}]:`, e); }
     }
@@ -343,7 +352,7 @@ export class AudioEngine {
           const inst = instruments[trackIdx]; if (!inst) continue;
           const type = inst.type;
           if (type === 'bass') this.triggerInstrument('bass', undefined, time, this._bassNoteForStep(step));
-          else if (type === 'kick' || type === 'snare' || type === 'hihat' || type === 'perc') this.triggerInstrument(type, undefined, time);
+          else if (type === 'kick' || type === 'snare' || type === 'hihat' || type === 'perc' || type === 'lead') this.triggerInstrument(type, undefined, time);
           else this.playSynth(type, step % 8, time, 0.6, trackIdx);
         }
       }
@@ -369,7 +378,6 @@ export class AudioEngine {
 
   setReverbLevel(level) { this.setReverbWet(level); }
   setDelayLevel(level)  { this.setDelayWet(level); }
-
   dispose() {
     this.stopSequencer();
     this.stopChordLoop();

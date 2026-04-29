@@ -63,14 +63,26 @@ export class SoundsystemRevealScene {
     const cityId = this.gameState.data.currentCity || 'new-york';
     const reveal = REVEAL_BY_CITY[cityId] || REVEAL_BY_CITY['new-york'];
 
-    // Background
+    // Background — direct img with object-fit:cover so the cinematic
+    // fills the viewport regardless of aspect ratio (no white space).
     const bg = document.createElement('div');
-    bg.style.cssText = 'position:absolute; inset:0; z-index:1;';
-    bg.appendChild(spriteImage(
-      reveal.bg,
-      reveal.bgAlt,
-      { width: window.innerWidth, height: window.innerHeight, style: 'object-fit:cover;' }
-    ));
+    bg.style.cssText = 'position:absolute; inset:0; z-index:1; background:#0a0a1e;';
+    const bgImg = new Image();
+    bgImg.src = reveal.bg;
+    bgImg.alt = reveal.bgAlt;
+    bgImg.style.cssText = `
+      position:absolute; inset:0;
+      width:100%; height:100%; object-fit:cover; object-position:center;
+      image-rendering:pixelated; display:block;
+    `;
+    bgImg.onerror = () => {
+      const ph = document.createElement('div');
+      ph.className = 'sprite-placeholder';
+      ph.style.cssText = 'width:100%; height:100%; font-size:14px;';
+      ph.textContent = `[${reveal.bgAlt}]`;
+      bg.appendChild(ph);
+    };
+    bg.appendChild(bgImg);
     stage.appendChild(bg);
 
     // Centered text
