@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Beat World 2.0 — Vibe Jam 2026</title>
-  <meta name="description" content="Produce beats across 20 cities worldwide. A music production game for Vibe Jam 2026." />
+  <meta name="description" content="Produce beats across the world. A pixel-art music production game for Vibe Jam 2026." />
   <meta property="og:title" content="Beat World 2.0" />
-  <meta property="og:description" content="Produce beats across 20 cities worldwide." />
+  <meta property="og:description" content="Cook beats. Get reviewed. Earn rigs." />
   <meta property="og:type" content="website" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
@@ -28,14 +28,6 @@
     }
     #loading-screen.hidden { opacity: 0; pointer-events: none; }
     #loading-screen h1 { font-size: 24px; margin-bottom: 20px; text-shadow: 2px 2px 0 #ff3399; }
-    #loading-screen .bar-outer {
-      width: 300px; height: 20px; border: 2px solid #ffaa00;
-      background: #1a1a3e; position: relative;
-    }
-    #loading-screen .bar-inner {
-      height: 100%; background: linear-gradient(90deg, #ff3399, #ffaa00);
-      width: 0%; transition: width 0.3s;
-    }
     #loading-screen .hint {
       margin-top: 16px; font-size: 8px; color: #888; animation: blink 1.2s infinite;
     }
@@ -123,9 +115,14 @@
   </style>
 </head>
 <body>
+  <!--
+    Vibe Jam 2026 rule 08: NO loading screens / heavy downloads. The only
+    pre-game UI we keep is a click-to-start gesture (browsers require a
+    user interaction before AudioContext can run, and rule 8 explicitly
+    permits a single "ask username"-style prompt). Progress bar removed.
+  -->
   <div id="loading-screen">
     <h1>BEAT WORLD 2.0</h1>
-    <div class="bar-outer"><div class="bar-inner" id="load-bar"></div></div>
     <p class="hint">CLICK ANYWHERE TO START</p>
   </div>
   <canvas id="game-canvas"></canvas>
@@ -146,8 +143,8 @@
     </div>
     <div id="screen-container"></div>
   </div>
-  <!-- Vibe Jam 2026 Portal Widget -->
-  <script async src="https://vibejam.cc/2026/widget.js"></script>
+  <!-- Vibe Jam 2026 — REQUIRED entrant widget (per rule 02). DO NOT EDIT URL. -->
+  <script async src="https://vibej.am/2026/widget.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
