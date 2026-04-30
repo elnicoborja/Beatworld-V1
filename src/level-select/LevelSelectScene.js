@@ -5,6 +5,7 @@
  */
 import { LEVEL_PROGRESSION } from '../data/LevelProgression.js';
 import { spriteImage, characterImage } from '../ui/SpriteImage.js';
+import { subscribeBeatworldEmail } from '../utils/KlaviyoBeatworld.js';
 
 export class LevelSelectScene {
   constructor(gameState, switchScene, enterCity) {
@@ -227,14 +228,54 @@ export class LevelSelectScene {
     document.body.appendChild(modal);
     const close = () => modal.remove();
     modal.querySelector('#lv-preview-close').addEventListener('click', close);
-    modal.querySelector('#lv-preview-submit').addEventListener('click', () => {
+    modal.querySelector('#lv-preview-submit').addEventListener('click', async () => {
       const input = modal.querySelector('#lv-preview-email');
+      const submitBtn = modal.querySelector('#lv-preview-submit');
       const email = (input.value || '').trim();
       if (!email || !email.includes('@')) { input.style.borderColor = '#ff3344'; input.focus(); return; }
-      const subject = encodeURIComponent(`Beat World — Notify me when ${level.region} (Level ${level.level}) ships`);
-      const body = encodeURIComponent(`Email: ${email}\nLevel: ${level.level} ${level.region} ${level.genre}\nCity: ${this.gameState.data.playerCity || ''}\nMaps: ${this.gameState.getPlayerCityMapsUrl?.() || ''}`);
-      window.location.href = `mailto:hola@nicoborja.com?subject=${subject}&body=${body}`;
-      close();
+
+      submitBtn.disabled = true;
+      const originalLabel = submitBtn.textContent;
+      submitBtn.textContent = 'SUBSCRIBING…';
+      input.style.borderColor = level.color;
+
+      const result = await subscribeBeatworldEmail({
+        email,
+        firstName: this.gameState.data.playerName,
+        customSource: `beatworld_l${level.level}_unlock`,
+        properties: {
+          requested_level: level.level,
+          requested_region: level.region,
+          requested_genre: level.genre,
+          requested_piece: level.piece,
+          producer_name: this.gameState.data.playerName || '',
+          producer_city: this.gameState.data.playerCity || '',
+          producer_maps_url: this.gameState.getPlayerCityMapsUrl?.() || '',
+          current_clout: this.gameState.data.clout || 0,
+        },
+      });
+
+      if (result.ok) {
+        submitBtn.textContent = "✓ YOU'RE ON THE LIST";
+        submitBtn.style.background = '#00cc44';
+        submitBtn.style.color = '#000';
+        setTimeout(close, 1400);
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel;
+        input.style.borderColor = '#ff3344';
+        // Surface a tiny inline error so the user knows it didn't go through.
+        let err = modal.querySelector('#lv-preview-err');
+        if (!err) {
+          err = document.createElement('div');
+          err.id = 'lv-preview-err';
+          err.style.cssText = 'font-size:7px; color:#ff5566; text-align:center; padding-top:4px;';
+          input.insertAdjacentElement('afterend', err);
+        }
+        err.textContent = result.error === 'invalid_email'
+          ? 'CHECK YOUR EMAIL FORMAT'
+          : 'SIGNUP FAILED — TRY AGAIN';
+      }
     });
     modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
   }

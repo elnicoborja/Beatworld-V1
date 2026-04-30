@@ -158,7 +158,11 @@ export class AudioEngine {
   getChordStatus(idx) { if (this._levelLoadPromise && !this._levelLoadPromise._resolved) return 'loading'; return this.chordLoops[idx] ? 'sample' : 'missing'; }
 
   loadLevel(levelId) {
-    if (this._levelLoadPromise) return this._levelLoadPromise;
+    // Re-entrancy guard: if we've already loaded (or are loading) THIS level, reuse.
+    if (this._levelLoadPromise && this._loadedLevelId === levelId) return this._levelLoadPromise;
+    // Different level → tear down prior buffers before starting a fresh load.
+    if (this._loadedLevelId && this._loadedLevelId !== levelId) this._disposeSamples();
+    this._loadedLevelId = levelId;
     const base = `/assets/audio/${levelId}/`;
     const tasks = [];
     this._loadStatus = { total: 0, completed: 0, failed: 0 };
@@ -187,6 +191,35 @@ export class AudioEngine {
     all._resolved = false;
     this._levelLoadPromise = all;
     return all;
+  }
+
+  // Tear down samplers + chord players from the previously loaded level so
+  // the next loadLevel() pulls fresh URLs into clean buffers. The TrackBus
+  // chain (input/vol/sends/master) is reused — only the leaf nodes change.
+  _disposeSamples() {
+    this.stopChordLoop();
+    for (const type of Object.keys(this.samples)) {
+      if (!this.samples[type]) continue;
+      this.samples[type].forEach((s, i) => {
+        if (s) {
+          try { s.disconnect(); } catch (_) {}
+          try { s.dispose(); } catch (_) {}
+          this.samples[type][i] = null;
+        }
+      });
+    }
+    this.chordLoops.forEach((p, i) => {
+      if (p) {
+        try { p.stop(); } catch (_) {}
+        try { p.disconnect(); } catch (_) {}
+        try { p.dispose(); } catch (_) {}
+        this.chordLoops[i] = null;
+      }
+    });
+    this._levelLoadPromise = null;
+    this._loadStatus = { total: 0, completed: 0, failed: 0 };
+    this.audioPrefs.chordProgression = 0;
+    this._pendingChordIdx = null;
   }
 
   _withTimeout(promise, ms = 6000) { return new Promise((resolve, reject) => { const t = setTimeout(() => reject(new Error('load timeout')), ms); promise.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); }); }); }

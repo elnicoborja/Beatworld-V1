@@ -7,10 +7,7 @@
 import { spriteImage, characterImage } from '../ui/SpriteImage.js';
 import { mountSoundOsFooter } from '../ui/SoundOsFooter.js';
 import { CHORD_PROGRESSIONS } from '../studio/AudioEngine.js';
-
-// TODO: switch to Klaviyo POST when list is provisioned.
-const JOIN_EMAIL_TO = 'hola@nicoborja.com';
-const JOIN_SUBJECT = 'Beat World — Join the Directory';
+import { subscribeBeatworldEmail } from '../utils/KlaviyoBeatworld.js';
 
 // Mock producers shown alongside the player's YOU card.
 // `style` + `presentation` reuse the 12 character sprites already on disk
@@ -375,18 +372,57 @@ export class DirectoryScene {
 
     const close = () => modal.remove();
     modal.querySelector('#join-cancel').addEventListener('click', close);
-    modal.querySelector('#join-submit').addEventListener('click', () => {
+    modal.querySelector('#join-submit').addEventListener('click', async () => {
       const input = modal.querySelector('#join-email');
+      const submitBtn = modal.querySelector('#join-submit');
       const email = (input.value || '').trim();
       if (!email || !email.includes('@')) {
         input.style.borderColor = '#ff3344';
         input.focus();
         return;
       }
-      const body = encodeURIComponent(`Email: ${email}\nProducer: ${this.gameState.data.playerName}\nCity: ${this.gameState.data.playerCity || ''}\nMaps: ${this.gameState.getPlayerCityMapsUrl?.() || ''}`);
-      const subject = encodeURIComponent(JOIN_SUBJECT);
-      window.location.href = `mailto:${JOIN_EMAIL_TO}?subject=${subject}&body=${body}`;
-      close();
+
+      submitBtn.disabled = true;
+      const originalLabel = submitBtn.textContent;
+      submitBtn.textContent = 'SUBSCRIBING…';
+      input.style.borderColor = '#00ddff';
+
+      const latestBeat = this.gameState.getLatestBeat ? this.gameState.getLatestBeat() : null;
+      const result = await subscribeBeatworldEmail({
+        email,
+        firstName: this.gameState.data.playerName,
+        customSource: 'beatworld_directory',
+        properties: {
+          producer_name: this.gameState.data.playerName || '',
+          producer_city: this.gameState.data.playerCity || '',
+          producer_maps_url: this.gameState.getPlayerCityMapsUrl?.() || '',
+          current_clout: this.gameState.data.clout || 0,
+          latest_beat_name: latestBeat?.beatName || '',
+          latest_beat_city: latestBeat?.cityId || '',
+          latest_beat_rating: latestBeat?.rating || 0,
+        },
+      });
+
+      if (result.ok) {
+        submitBtn.textContent = "✓ ON THE LIST";
+        submitBtn.style.background = '#00cc44';
+        submitBtn.style.color = '#000';
+        setTimeout(close, 1400);
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel;
+        input.style.borderColor = '#ff3344';
+        let err = modal.querySelector('#join-err');
+        if (!err) {
+          err = document.createElement('div');
+          err.id = 'join-err';
+          err.style.cssText = 'font-size:7px; color:#ff5566; text-align:center;';
+          input.insertAdjacentElement('afterend', err);
+        }
+        err.textContent = result.error === 'invalid_email'
+          ? 'CHECK YOUR EMAIL FORMAT'
+          : 'SIGNUP FAILED — TRY AGAIN';
+      }
     });
   }
 
