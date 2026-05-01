@@ -1,10 +1,10 @@
 /**
  * KlaviyoBeatworld — public client subscribe (no backend).
- * Account: hola@nicoborja.com / company YxFZNy / list Y92T2b
+ * Account: hola@nicoborja.com / company YxFZNy  / list XWMAX8 (Beat World)
  */
 
 const KLAVIYO_COMPANY_ID = 'YxFZNy';
-const KLAVIYO_LIST_ID    = 'Y92T2b';
+const KLAVIYO_LIST_ID    = 'XWMAX8';
 const KLAVIYO_REVISION   = '2024-10-15';
 
 export async function subscribeBeatworldEmail({
