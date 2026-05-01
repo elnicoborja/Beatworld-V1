@@ -1,11 +1,29 @@
 /**
  * KlaviyoBeatworld — public client subscribe (no backend).
- * Account: hola@nicoborja.com / company YxFZNy  / list XWMAX8 (Beat World)
+ * Account: hola@nicoborja.com / company YxFZNy / list XWMAX8 (Beat World)
+ *
+ * Endpoint: POST /client/subscriptions/ — purpose-built for browser
+ * forms. The act of POSTing a profile + list relationship IS the
+ * subscription; no `subscriptions` consent block needed here. (That
+ * block is for the SERVER-side /api/profiles endpoint, not this one.)
+ *
+ * Empty/null property values are stripped client-side because Klaviyo's
+ * stricter accounts reject them with 400.
  */
 
 const KLAVIYO_COMPANY_ID = 'YxFZNy';
 const KLAVIYO_LIST_ID    = 'XWMAX8';
 const KLAVIYO_REVISION   = '2024-10-15';
+
+function cleanProperties(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'string' && v.trim() === '') continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 export async function subscribeBeatworldEmail({
   email,
@@ -17,14 +35,13 @@ export async function subscribeBeatworldEmail({
     return { ok: false, error: 'invalid_email' };
   }
 
+  const cleanProps = cleanProperties({ source: 'beatworld', ...properties });
+
   const profileAttrs = {
     email,
-    properties: { source: 'beatworld', ...properties },
-    subscriptions: {
-      email: { marketing: { consent: 'SUBSCRIBED' } },
-    },
+    properties: cleanProps,
   };
-  if (firstName) profileAttrs.first_name = firstName;
+  if (firstName && firstName.trim()) profileAttrs.first_name = firstName.trim();
 
   const body = {
     data: {
